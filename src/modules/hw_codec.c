@@ -9,13 +9,48 @@
 #include "adau1787.h"
 #include "adau_1787_IC_1_SIGMA_PARAM.h"
 
+#include <errno.h>
 #include <stdbool.h>
 #include <zephyr/logging/log.h>
 LOG_MODULE_REGISTER(hw_codec, CONFIG_MODULE_HW_CODEC_LOG_LEVEL);
 
+#define ADC_SOURCE_SWITCH_ADDRESS MOD_ADCSELECT_MONOSWSLEW_ADDR
 #define LISTENING_MODE_SWITCH_ADDRESS MOD_SOURCESELECT_STEREOSWSLEW_ADDR
 #define LISTENING_MODE_I2S 0U
 #define LISTENING_MODE_LOCAL 1U
+
+BUILD_ASSERT(MOD_ADCSELECT_COUNT == 1, "ADC Select block must contain one parameter");
+BUILD_ASSERT(IS_PARAM_ADDR(ADC_SOURCE_SWITCH_ADDRESS), "ADC Select parameter must be in parameter RAM");
+
+typedef enum source_adc {
+  ADC_0,
+  ADC_1,
+  ADC_2,
+  ADC_3,
+} source_adc;
+
+static int set_source_adc(source_adc source)
+{
+  param_word_t param = {
+    0U,
+    0U,
+    0U,
+    (uint8_t)source,
+  };
+  int ret;
+
+  if ((uint32_t)source > (uint32_t)ADC_3) {
+    LOG_ERR("Invalid ADC source: %d", source);
+    return -EINVAL;
+  }
+
+  ret = adau1787_safeload_write(ADC_SOURCE_SWITCH_ADDRESS, param, MOD_ADCSELECT_COUNT);
+  if (ret != 0) {
+    LOG_ERR("Failed to select ADC source %d at 0x%04X: %d", source, ADC_SOURCE_SWITCH_ADDRESS, ret);
+  }
+
+  return ret;
+}
 
 static int set_dac_mute(bool mute)
 {
@@ -106,7 +141,14 @@ int hw_codec_soft_reset(void)
 
 int hw_codec_init(void)
 {
-  return adau1787_init();
+  int ret;
+
+  ret = adau1787_init();
+  if (ret != 0) {
+    return ret;
+  }
+
+  return set_source_adc(ADC_0);
 }
 
 int hw_codec_select_local(void)
