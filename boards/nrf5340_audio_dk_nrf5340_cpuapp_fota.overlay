@@ -1,4 +1,10 @@
 / {
+	aliases {
+		led0 = &led1_blue;
+		led1 = &led2_green;
+		led2 = &led3_green;
+	};
+
 	chosen {
 		nordic,pm-ext-flash = &mx25r64;
 	};
