@@ -45,16 +45,16 @@ config REGULATOR
 	default y
 
 config CONTIN_ARRAY
-	default y
+	default y if TIRESIAS_AUDIO_HW
 
 config NRFX_I2S0
-	default y
+	default y if TIRESIAS_AUDIO_HW
 
 config PCM_MIX
-	default y
+	default y if TIRESIAS_AUDIO_HW
 
 config PSCM
-	default y
+	default y if TIRESIAS_AUDIO_HW
 
 config DATA_FIFO
 	default y

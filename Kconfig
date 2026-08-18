@@ -10,6 +10,30 @@ menuconfig NRF5340_AUDIO
 
 if NRF5340_AUDIO
 
+config TIRESIAS_AUDIO_HW
+	bool "Enable Tiresias hardware audio path"
+	default y if BOARD_TIRESIAS_DK_NRF5340_CPUAPP
+	depends on BOARD_TIRESIAS_DK_NRF5340_CPUAPP
+	help
+	  Enable the I2S audio datapath used by the Tiresias DK. Disable this
+	  option for Bluetooth-only testing on boards without the Tiresias audio
+	  hardware. The Bluetooth transport remains active and received ISO data
+	  is discarded by compile-time stubs.
+
+config AUDIO_CODEC_ADAU1787
+	bool "Enable ADAU1787 codec"
+	default y if TIRESIAS_AUDIO_HW
+	depends on I2C && GPIO
+	help
+	  Enable the ADAU1787 codec driver, SigmaStudio firmware, and hardware
+	  codec control. This option is independent of the Tiresias audio path
+	  and can be enabled for an external ADAU1787 connected to another board.
+
+	  The target devicetree must provide an enabled adau_1787 node on the
+	  desired I2C bus, including powerdown-gpios and MP3 through MP6 GPIOs.
+	  The Tiresias DK board supplies this node; other boards must supply it
+	  in an application overlay.
+
 config CUSTOM_BROADCASTER
 	bool "Allow custom broadcasters"
 	default n
