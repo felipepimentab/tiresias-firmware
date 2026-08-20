@@ -33,6 +33,7 @@ zephyr_library_include_directories(
     src/audio
     src/application
     src/bluetooth
+    src/codec
     src/drivers
     src/modules
     src/utils
@@ -44,6 +45,7 @@ zephyr_library_include_directories(
 add_subdirectory(src/audio)
 add_subdirectory(src/application)
 add_subdirectory(src/bluetooth)
+add_subdirectory(src/codec)
 add_subdirectory(src/drivers)
 add_subdirectory(src/modules)
 add_subdirectory(src/utils)

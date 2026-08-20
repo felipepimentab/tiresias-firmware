@@ -11,6 +11,7 @@ Quick references are grouped by scope.
 - [Zbus](architecture/zbus.md): channel ownership and delivery contracts.
 - [Hardware](architecture/hardware.md): board-level blocks and interfaces.
 - [Audio messages](architecture/audio-application.md): current message ownership.
+- [Source layout](architecture/source-layout.md): ownership boundaries and incremental organization.
 
 ## Development
 

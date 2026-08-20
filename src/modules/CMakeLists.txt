@@ -15,9 +15,6 @@ else()
 	target_sources(app PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/audio_sync_timer_stub.c)
 endif()
 
-target_sources_ifdef(CONFIG_AUDIO_CODEC_ADAU1787 app PRIVATE
-		     ${CMAKE_CURRENT_SOURCE_DIR}/hw_codec.c)
-
 target_sources_ifdef(CONFIG_NRF5340_AUDIO_POWER_MEASUREMENT app PRIVATE
                      ${CMAKE_CURRENT_SOURCE_DIR}/power_meas.c)
 target_sources_ifdef(CONFIG_NRF5340_AUDIO_SD_CARD_MODULE app PRIVATE
