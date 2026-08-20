@@ -6,7 +6,9 @@
 
 #include "codec_controller.h"
 
+#if defined(CONFIG_AUDIO_CODEC_ADAU1787)
 #include "hw_codec.h"
+#endif
 #include "zbus_common.h"
 
 #include <zephyr/kernel.h>
@@ -94,11 +96,16 @@ static void publish_led_command(led_cmd_t command)
 
 static int select_local_mode(void)
 {
-  int ret = hw_codec_select_local();
+  int ret;
 
+#if defined(CONFIG_AUDIO_CODEC_ADAU1787)
+  ret = hw_codec_select_local();
   if (ret != 0) {
     return ret;
   }
+#else
+  LOG_DBG("Hardware codec disabled; selecting logical local mode only");
+#endif
 
   ret = set_state(CODEC_CONTROLLER_STATE_LOCAL_ONLY);
   if (ret != 0) {
@@ -112,11 +119,16 @@ static int select_local_mode(void)
 
 static int select_broadcast_mode(void)
 {
-  int ret = hw_codec_select_i2s();
+  int ret;
 
+#if defined(CONFIG_AUDIO_CODEC_ADAU1787)
+  ret = hw_codec_select_i2s();
   if (ret != 0) {
     return ret;
   }
+#else
+  LOG_DBG("Hardware codec disabled; selecting logical broadcast mode only");
+#endif
 
   ret = set_state(CODEC_CONTROLLER_STATE_BROADCAST_ONLY);
   if (ret != 0) {
@@ -158,12 +170,16 @@ static void handle_state_off(const struct zbus_channel* channel)
     return;
   }
 
+#if defined(CONFIG_AUDIO_CODEC_ADAU1787)
   ret = hw_codec_init();
   if (ret != 0) {
     LOG_ERR("Failed to initialize the hardware codec: %d", ret);
     enter_error();
     return;
   }
+#else
+  LOG_INF("Hardware codec disabled for Bluetooth-only testing");
+#endif
 
   ret = select_local_mode();
   if (ret != 0) {

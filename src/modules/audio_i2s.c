@@ -16,6 +16,11 @@
 
 #define I2S_NL DT_NODELABEL(i2s0)
 
+BUILD_ASSERT(DT_NODE_HAS_STATUS(I2S_NL, okay),
+	     "CONFIG_TIRESIAS_AUDIO_HW requires an enabled i2s0 devicetree node");
+BUILD_ASSERT(DT_NODE_HAS_PROP(I2S_NL, pinctrl_0),
+	     "CONFIG_TIRESIAS_AUDIO_HW requires an i2s0 default pinctrl state");
+
 enum audio_i2s_state {
 	AUDIO_I2S_STATE_UNINIT,
 	AUDIO_I2S_STATE_IDLE,

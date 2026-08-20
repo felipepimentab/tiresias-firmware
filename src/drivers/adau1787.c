@@ -27,6 +27,15 @@ BUILD_ASSERT(PARAM_ADDR_IC_1_Sigma == 0x2000, "Param Memory Address must be 0x20
 /** @brief Device Tree Specification for ADAU1787 */
 #define ADAU1787_NODE DT_NODELABEL(adau_1787)
 
+BUILD_ASSERT(DT_NODE_HAS_STATUS(ADAU1787_NODE, okay),
+    "CONFIG_AUDIO_CODEC_ADAU1787 requires an enabled adau_1787 devicetree node");
+BUILD_ASSERT(DT_ON_BUS(ADAU1787_NODE, i2c), "The adau_1787 devicetree node must be on an I2C bus");
+BUILD_ASSERT(
+    DT_NODE_HAS_PROP(ADAU1787_NODE, powerdown_gpios), "The adau_1787 devicetree node requires powerdown-gpios");
+BUILD_ASSERT(DT_NODE_HAS_PROP(ADAU1787_NODE, mp3_gpios) && DT_NODE_HAS_PROP(ADAU1787_NODE, mp4_gpios)
+        && DT_NODE_HAS_PROP(ADAU1787_NODE, mp5_gpios) && DT_NODE_HAS_PROP(ADAU1787_NODE, mp6_gpios),
+    "The adau_1787 devicetree node requires MP3 through MP6 GPIOs");
+
 /** @brief I2C device configuration structure for ADAU1787 */
 const struct i2c_dt_spec adau1787_i2c = I2C_DT_SPEC_GET(ADAU1787_NODE);
 /** @brief Codec !PD pin (Power Down - active low) */
@@ -86,7 +95,7 @@ void adau1787_log_status_2(void)
 /**
  * @brief Configures GPIO pins for the ADAU1787
  */
-int adau1787_config_gpios(void)
+static int adau1787_config_gpios(void)
 {
   int ret = 0;
 
@@ -162,46 +171,19 @@ int adau1787_power_down(void)
   return ret;
 }
 
-/**
- * @brief Configures the I2C bus for the ADAU1787
- */
-int adau1787_config_i2c(void)
-{
-  int ret = 0;
-
-  const struct device* i2c_dev = device_get_binding("I2C_1");
-  if (!i2c_dev) {
-    LOG_ERR("I2C binding failed.");
-    return -1;
-  }
-
-  ret = i2c_configure(i2c_dev, I2C_SPEED_SET(I2C_SPEED_FAST_PLUS));
-  if (ret != 0) {
-    LOG_ERR("Failed to configure I2C_1: %d", ret);
-    return ret;
-  }
-
-  LOG_DBG("SCL pin: %d", NRF_TWIM1->PSEL.SCL);
-  LOG_DBG("SDA pin: %d", NRF_TWIM1->PSEL.SDA);
-  LOG_DBG("I2C frequency: %d", NRF_TWIM1->FREQUENCY);
-
-  if (!device_is_ready(adau1787_i2c.bus)) {
-    LOG_ERR("I2C bus %s is not ready!", adau1787_i2c.bus->name);
-    return -1;
-  }
-
-  return ret;
-}
-
 int adau1787_init(void)
 {
+  int ret;
+
   LOG_INF("Initializing audio codec...");
-  int ret = 0;
+
+  if (!i2c_is_ready_dt(&adau1787_i2c)) {
+    LOG_ERR("I2C bus %s is not ready", adau1787_i2c.bus->name);
+    return -ENODEV;
+  }
 
   ret = adau1787_config_gpios();
   ERR_CHK_MSG(ret, "Failed to config ADAU1787 GPIOs");
-  ret = adau1787_config_i2c();
-  ERR_CHK_MSG(ret, "Failed to config ADAU1787 I2C");
   ret = adau1787_power_up();
   ERR_CHK_MSG(ret, "Failed to power up ADAU1787");
   k_msleep(100);

@@ -21,9 +21,6 @@
 #include "bt_mgmt_ctlr_cfg_internal.h"
 #include "bt_mgmt_adv_internal.h"
 #include "bt_mgmt_dfu_internal.h"
-#if CONFIG_BOARD_NRF5340_AUDIO_DK_NRF5340_CPUAPP
-#include "button_assignments.h"
-#endif
 
 #include <zephyr/logging/log.h>
 LOG_MODULE_REGISTER(bt_mgmt, CONFIG_BT_MGMT_LOG_LEVEL);
@@ -237,11 +234,11 @@ static void bt_enabled_cb(int err)
 
 static int bonding_clear_check(void)
 {
-#if CONFIG_BOARD_NRF5340_AUDIO_DK_NRF5340_CPUAPP
+#if DT_NODE_HAS_PROP(DT_ALIAS(sw4), gpios)
 	int ret;
 	bool pressed;
 
-	ret = button_pressed(BUTTON_5, &pressed);
+	ret = button_pressed(DT_GPIO_PIN(DT_ALIAS(sw4), gpios), &pressed);
 	if (ret) {
 		return ret;
 	}
@@ -250,8 +247,8 @@ static int bonding_clear_check(void)
 		ret = bt_mgmt_bonding_clear();
 		return ret;
 	}
+#endif /* DT_NODE_HAS_PROP(DT_ALIAS(sw4), gpios) */
 
-#endif
 	return 0;
 }
 
@@ -405,10 +402,10 @@ static int bt_mgmt_init_once(void)
 		}
 	}
 
-#if defined(CONFIG_AUDIO_BT_MGMT_DFU)
+#if defined(CONFIG_AUDIO_BT_MGMT_DFU) && DT_NODE_HAS_PROP(DT_ALIAS(sw3), gpios)
 	bool pressed;
 
-	ret = button_pressed(BUTTON_4, &pressed);
+	ret = button_pressed(DT_GPIO_PIN(DT_ALIAS(sw3), gpios), &pressed);
 	if (ret) {
 		return ret;
 	}
@@ -421,8 +418,7 @@ static int bt_mgmt_init_once(void)
 		/* This call will not return */
 		bt_mgmt_dfu_start();
 	}
-
-#endif /* CONFIG_AUDIO_BT_MGMT_DFU */
+#endif /* defined(CONFIG_AUDIO_BT_MGMT_DFU) && DT_NODE_HAS_PROP(DT_ALIAS(sw3), gpios) */
 
 	ret = bt_mgmt_ctlr_cfg_init(IS_ENABLED(CONFIG_WDT_CTLR));
 	if (ret) {

@@ -21,7 +21,6 @@ configure_file("${CMAKE_CURRENT_SOURCE_DIR}/src/utils/fw_info_app.c.in"
                "${CMAKE_BINARY_DIR}/fw_info_app.c"
                @ONLY)
 
-# Target sources below are specific to the nRF5340 Audio DK HW
 target_sources(app PRIVATE
     ${CMAKE_BINARY_DIR}/fw_info_app.c
     )
@@ -41,9 +40,6 @@ zephyr_library_include_directories(
     src/SigmaStudioFiles
 )
 
-zephyr_library_include_directories(app PRIVATE
-    ${ZEPHYR_NRF_MODULE_DIR}/boards/arm/nrf5340_audio_dk_nrf5340)
-
 # Application sources
 add_subdirectory(src/audio)
 add_subdirectory(src/application)
@@ -51,4 +47,7 @@ add_subdirectory(src/bluetooth)
 add_subdirectory(src/drivers)
 add_subdirectory(src/modules)
 add_subdirectory(src/utils)
-add_subdirectory(src/SigmaStudioFiles)
+
+if(CONFIG_AUDIO_CODEC_ADAU1787)
+    add_subdirectory(src/SigmaStudioFiles)
+endif()

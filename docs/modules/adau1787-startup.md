@@ -29,8 +29,9 @@ The codec is therefore programmed before BCLK and LRCK begin toggling.
 | Base codec node and binding | `../boards/eesc-usp/tiresias_dk/tiresias_dk_nrf5340_cpuapp_common.dtsi` and `../boards/eesc-usp/tiresias_dk/dts/bindings/audio/adi,adau1787.yaml` |
 
 The last two base-board files are supplied by the sibling `boards` repository,
-not by this application repository. They remain compile-time dependencies
-because the driver uses `DT_NODELABEL(adau_1787)`.
+not by this application repository. The Tiresias DK uses them directly. Other
+targets can enable `CONFIG_AUDIO_CODEC_ADAU1787` independently by supplying an
+equivalent `adau_1787` node in an application devicetree overlay.
 
 ## End-to-End Sequence
 
@@ -54,7 +55,7 @@ sequenceDiagram
     I2S->>I2S: start 12.288 MHz ACLK and configure I2S
     Note right of I2S: Peripheral is idle and no PCM frames are running yet
     Driver->>Codec: assert !PD and drive MP3 through MP6 inactive
-    Driver->>Driver: configure I2C Fast Plus
+    Driver->>Driver: verify devicetree-selected I2C bus
     Driver->>Codec: release !PD
     Driver->>Driver: sleep 100 ms
     Driver->>Codec: Sigma download (208 writes + one delay request)
@@ -86,7 +87,7 @@ for a gateway built with `CONFIG_AUDIO_SOURCE_USB`.
 
 The driver creates an `i2c_dt_spec` and five `gpio_dt_spec` objects from the
 `adau_1787` devicetree node. Startup cannot be compiled without the node and
-its required `powerdown-gpios` property.
+its required `powerdown-gpios` and MP3-through-MP6 GPIO properties.
 
 ### Control interface
 
@@ -98,19 +99,20 @@ The base board definition places the ADAU1787 on `i2c1`:
 | 7-bit codec address | `0x2B` |
 | SDA | P1.2 |
 | SCL | P1.3 |
-| Devicetree bus rate | Standard mode |
-| Driver-selected bus rate | Fast Plus, requested at runtime |
+| Devicetree bus rate | Fast Plus mode |
 | nRF concatenation buffer | 4092 bytes |
 
-`adau1787_config_i2c()` looks up `I2C_1`, requests
-`I2C_SPEED_FAST_PLUS`, and then verifies that the bus in the codec's
-`i2c_dt_spec` is ready. A failed `i2c_configure()` call is logged and returned
-before codec programming begins.
+`adau1787_init()` verifies that the bus selected by the codec's `i2c_dt_spec`
+is ready. Bus instance, pins, and bitrate come from devicetree; the driver does
+not assume TWIM1 or override the configured bus speed. This allows a DK overlay
+to place an external EVAL-ADAU1787 on any suitable I2C controller and GPIO
+header pins.
 
 The generated SigmaStudio headers contain `DEVICE_ADDR_* = 0x50`, but that
 value does **not** choose the target on this platform. `SigmaStudioFW.h` accepts
 the generated `devAddress` argument and ignores it; every generated transfer is
-forwarded to `adau1787_write()`, which uses the devicetree address `0x2B`.
+forwarded to `adau1787_write()`, which uses the address from devicetree
+(`0x2B` on the Tiresias DK).
 
 ### Reset, multipurpose, and audio pins
 
@@ -157,10 +159,12 @@ no build overlay changes those Kconfig choices. At this stage the peripheral is
 configured but `nrfx_i2s_start()` has not been called, so regular BCLK/LRCK
 frames are not yet running.
 
-## Stage 2: Hold the Codec in Reset and Configure Pins
+## Stage 2: Verify the Control Bus and Configure Pins
 
 `hw_codec_init()` is a thin wrapper around `adau1787_init()`. The driver begins
-by logging `Initializing audio codec...` and calls `adau1787_config_gpios()`.
+by logging `Initializing audio codec...` and verifying that the
+devicetree-selected I2C bus initialized successfully. It then calls
+`adau1787_config_gpios()`.
 
 The GPIO setup is deliberately ordered as follows:
 
@@ -174,12 +178,12 @@ Each readiness or configuration failure stops this phase. A controller that is
 not ready produces `-ENODEV`; a GPIO configuration error is propagated as
 returned by Zephyr.
 
-## Stage 3: Configure I2C and Release `!PD`
+## Stage 3: Release `!PD`
 
-After the GPIOs are ready, the driver configures I2C and calls
-`adau1787_power_up()`. Power-up writes logical zero to the active-low `!PD`
-specifier, releasing the physical pin high. The firmware then sleeps for a
-fixed 100 ms before making the first codec transfer.
+After the GPIOs are ready, the driver calls `adau1787_power_up()`. Power-up
+writes logical zero to the active-low `!PD` specifier, releasing the physical
+pin high. The firmware then sleeps for a fixed 100 ms before making the first
+codec transfer.
 
 There is no device-ID probe or readiness poll between release and programming.
 The 100 ms delay is the only driver-level stabilization interval at this point.
@@ -344,13 +348,14 @@ Audio codec initialization done.
 
 When startup fails, check in this order:
 
-1. **Devicetree selection:** confirm the build uses the Tiresias DK board node,
-   the application overlay, address `0x2B`, and the expected swapped MP/I2S
+1. **Devicetree selection:** confirm the build has an enabled `adau_1787` node,
+   the correct EVAL-board I2C address, and the expected power-down and MP GPIO
+   assignments. On the Tiresias DK, also confirm the expected swapped MP/I2S
    pins.
 2. **GPIO readiness and polarity:** `!PD` must first go physically low and then
    high; MP3 through MP6 remain low during initialization.
-3. **I2C bus setup:** verify `I2C_1`, P1.2/P1.3, and that Fast Plus mode was
-   accepted. An `i2c_configure()` failure is logged and returned.
+3. **I2C bus setup:** verify the controller, SDA/SCL pins, and bitrate selected
+   by the target devicetree. A bus-readiness failure is logged and returned.
 4. **First transfer timing:** the first I2C transaction occurs 100 ms after
    `!PD` release. The generated `{0x00, 0x23}` delay adds 35 ms after the first
    `CHIP_PWR = 0x17` write.

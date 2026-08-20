@@ -6,8 +6,8 @@
 
 # Audio sync timer
 config NRFX_TIMER1
-	default y
+	default y if TIRESIAS_AUDIO_HW
 
 # Audio sync timer
 config NRFX_DPPI
-	default y
+	default y if TIRESIAS_AUDIO_HW

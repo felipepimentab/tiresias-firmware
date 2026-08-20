@@ -4,12 +4,19 @@
 # SPDX-License-Identifier: LicenseRef-Nordic-5-Clause
 #
 
-target_sources(app PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/audio_i2s.c)
-target_sources(app PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/audio_usb.c)
 target_sources(app PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/button_handler.c)
 target_sources(app PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/led.c)
-target_sources(app PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/audio_sync_timer.c)
-target_sources(app PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/hw_codec.c)
+
+if(CONFIG_TIRESIAS_AUDIO_HW)
+	target_sources(app PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/audio_i2s.c)
+	target_sources(app PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/audio_usb.c)
+	target_sources(app PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/audio_sync_timer.c)
+else()
+	target_sources(app PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/audio_sync_timer_stub.c)
+endif()
+
+target_sources_ifdef(CONFIG_AUDIO_CODEC_ADAU1787 app PRIVATE
+		     ${CMAKE_CURRENT_SOURCE_DIR}/hw_codec.c)
 
 target_sources_ifdef(CONFIG_NRF5340_AUDIO_POWER_MEASUREMENT app PRIVATE
                      ${CMAKE_CURRENT_SOURCE_DIR}/power_meas.c)
