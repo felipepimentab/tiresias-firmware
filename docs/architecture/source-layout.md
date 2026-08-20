@@ -23,6 +23,9 @@ Device Controller
   addresses, and semantic operations such as local/I2S selection and mute.
 - Codec Controller owns lifecycle, command validation, serialized access,
   presentation state, fallback policy, and error handling.
+- The DSP parameter catalog owns the allowlist and value constraints; the parameter
+  controller owns settings serialization, persistence, and revisions; the apply adapter is
+  the only boundary that may eventually write cataloged values to DSP hardware.
 
 Move Codec Controller and `hw_codec` out of `src/audio` and `src/modules` into a
 dedicated `src/codec_controller` directory, or `src/codec` if that name is

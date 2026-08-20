@@ -2,11 +2,10 @@
 
 ## Status
 
-Implemented foundation: shared Bluetooth initialization, connectable advertising, one
-peripheral ACL, Device Information Service, advertising restart, and LED 1 indication.
-
-Planned: custom Tiresias service, authorized sessions, status, parameter catalog, codec
-parameter access, and BASS integration. UUIDs and byte-level encoding are not yet defined.
+Implemented MVP: shared Bluetooth initialization, connectable advertising, one peripheral
+ACL, Device Information Service, the custom Tiresias service, cataloged parameter access,
+internal-flash persistence, advertising restart, and LED 1 indication. DSP writes are an
+explicit no-op boundary until hardware validation is available.
 
 ## Service boundaries
 
@@ -43,37 +42,50 @@ supports one incoming control/Broadcast Assistant ACL.
 |---|---|
 | `DISABLED` | Connectable control unavailable |
 | `ADVERTISING` | Accepting an ACL |
-| `LINKED` | ACL present; custom session not authorized |
-| `READY` | Secure, authorized, negotiated session |
+| `LINKED` | ACL present; session admission is in progress |
+| `READY` | Tiresias requests are admitted |
 | `ERROR` | Persistent local Control Link failure |
 
 - Enter `ADVERTISING` only after the indexed advertising-start event.
-- A peripheral ACL moves to `LINKED`; authorization and negotiation move to `READY`.
+- A peripheral ACL moves through `LINKED` to `READY`. The trusted-workstation MVP has no
+  authorization gate.
 - Disconnect cancels peer-owned work and requests advertising restart.
 - Malformed, unauthorized, busy, or rejected requests return protocol errors; they do not
   enter `ERROR`.
-- The current DIS-only foundation uses `CONNECTED`; split it before custom writes.
 
 ## Custom service
 
+The service UUID is `7b9a0001-6e4f-4b2d-a9c8-4f2e6f5d1000`. Characteristic UUIDs replace
+`0001` with `0002` through `0006` in table order:
+
 | Characteristic | Properties | Content |
 |---|---|---|
-| Protocol Information | Read | Versions, capabilities, limits, layout ID, boot/session ID |
-| Parameter Catalog | Read with offsets | Stable IDs, codec addresses, formats, bounds, units, flags |
-| Status | Read, Notify | Coherent subsystem and broadcast summary |
-| Request | Write | Framed command or transaction control |
-| Response | Indicate | Correlated terminal result and structured error |
-| Event | Notify | Sequenced unsolicited events |
-| Transfer Data | Future write/notify | Credited chunks for dumps, batches, and profiles |
+| Protocol Information (`0002`) | Read | Versions, capabilities, limits, layout ID, boot ID, revision |
+| Parameter Catalog (`0003`) | Read with offsets | Stable IDs, codec addresses, formats, bounds, units, flags |
+| Status (`0004`) | Read, Notify | Control state, persistence state, and last operation |
+| Request (`0005`) | Write | One correlated parameter operation |
+| Response (`0006`) | Indicate | Correlated terminal result |
 
 Wire values have explicit widths and byte order; never expose native C structures. Major
 versions break compatibility, minor versions add compatible fields, and capabilities gate
 optional operations. A client reads Protocol Information before modifying state.
 
-An ATT write response means the request entered a bounded queue, not that it completed.
-The Response indication uses the same transaction ID. Event sequence gaps require a Status
-reread. Status contains low-rate state and fault summaries; never include audio data,
-unbounded logs, credentials, or Broadcast Codes.
+All integers are little-endian. Wire layouts are fixed and encoded field by field:
+
+| Value | Size | Layout |
+|---|---:|---|
+| Protocol Information | 32 | `u8 major, u8 minor, u16 length, u32 capabilities, u16 max_request, u16 max_response, u16 entry_size, u16 entry_count, u32 layout_id, u32 catalog_crc, u32 boot_id, u32 revision` |
+| Catalog header | 16 | `u8 version, u8 entry_size, u16 count, u16 total_length, u16 reserved, u32 layout_id, u32 entries_crc` |
+| Catalog entry | 32 | `u16 id, u8 flags, u8 encoding, u16 address, u8 words, u8 unit, i32 min, i32 max, i32 default, i32 step, char name[8]` |
+| Request | 12 | `u8 opcode, u8 flags, u32 transaction_id, u16 parameter_id, i32 value` |
+| Response | 16 | `u8 opcode, u8 result, u32 transaction_id, u16 parameter_id, i32 value, u32 revision` |
+| Status | 16 | `u8 state, u8 flags, u8 last_result, u8 reserved, u32 revision, u32 last_transaction_id, u16 last_parameter_id, u16 reserved` |
+
+Protocol constants and result values are public in `tiresias_service.h`. Transaction ID zero,
+nonzero flags, and nonzero GET values are invalid. CCC, readiness, malformed-length, and busy
+failures are rejected at ATT admission; every accepted request completes with one indication
+using the same nonzero transaction ID while the session remains connected. The current catalog
+golden CRC32 is `0xdfac5b27`.
 
 ## Parameter catalog
 
@@ -82,28 +94,32 @@ The build-time catalog is the complete V1 allowlist. Each entry includes:
 - stable ID and current ADAU1787 byte address;
 - word count, encoding, scale, and byte order;
 - bounds, optional step or enum choices, and units;
-- readable, writable, volatile, and live-update-safe flags.
+- readable, writable, persistent, and live-update-safe flags.
 
-Generate the remote catalog and firmware lookup table from the same source associated with
-the SigmaStudio export. The firmware must not parse a host-provided map. Build failure is
-required if the immutable V1 catalog cannot fit the supported characteristic-value limit;
-never truncate it.
+The remote catalog and lookup table share one immutable descriptor array tied to the current
+SigmaStudio export. The firmware never parses a host-provided map; build assertions protect
+the fixed catalog count, DSP word size, address alignment, and wire size.
 
-Normal requests use stable IDs. Control Link validates framing, authorization, layout ID,
-size, and queue capacity. Codec Controller independently resolves the entry and validates
-state, access, type, range, address, alignment, and safety before I2C access.
+Normal requests use stable IDs. Control Link validates framing, readiness, size, and queue
+capacity. The DSP parameter controller independently resolves the entry and validates access,
+range, and step before persistence.
 
-V1 constraints:
+MVP constraints:
 
 - one outstanding parameter operation;
 - one parameter per correlated `GET_PARAMETER` or `SET_PARAMETER` request;
 - only cataloged, live-update-safe writes;
-- volatile changes applied through safeload;
-- no raw RAM/register access, persistence, batch atomicity, or whole-profile replacement.
+- every successful SET is committed as one versioned, layout-bound, CRC-checked settings
+  record before RAM state and revision advance;
+- the parameter controller loads its own settings subtree during initialization, so an empty
+  first boot commits catalog defaults and readiness is independent of Bluetooth startup order;
+- the exact Q5.23 step is `1/256`; values outside the catalog range or off-step are rejected;
+- no raw RAM/register access, batch atomicity, or whole-profile replacement.
 
-The current safeload path handles at most five four-byte words per group. Larger or unsafe
-entries are read-only until a maintenance path is designed. Persistent profiles require a
-separate versioned, integrity-checked, power-loss-safe store and explicit commit.
+The current catalog contains three phase-compensation gains and output headroom. The DSP
+adapter is intentionally empty, so success currently means the flash commit completed, not
+that hardware changed. Before real DSP writes are enabled, SET must be redesigned as a
+transaction that defines apply failure, rollback, and flash/DSP power-loss reconciliation.
 
 Future bulk transfers use a session ID, transaction ID, layout ID, declared parameter set,
 offsets, total length, integrity value, credits, and fixed owned buffers. Disconnect,
@@ -122,9 +138,10 @@ partial-application semantics.
 | ADAU1787 validation and access | Codec Controller |
 
 `bt_mgmt_init()` is mutex-protected and caches the first result for the boot; either Control
-Link or Audio Streaming may call first. The current build assigns advertising set 0 only
-to Control Link. New advertising clients require an allocator/composer and updated
-controller limits.
+Link or Audio Streaming may call first. Application startup registers the DSP settings handler
+before either subsystem can initialize Bluetooth and call `settings_load()`. The current build
+assigns advertising set 0 only to Control Link. New advertising clients require an
+allocator/composer and updated controller limits.
 
 `bt_mgmt_adv_start()` is asynchronous. Control Link tracks the pending index and changes
 state only on `BT_MGMT_EXT_ADV_STARTED`; `BT_MGMT_EXT_ADV_FAILED` reports failure. ACL
@@ -145,11 +162,10 @@ The build enables Scan Delegator capability, but the compiled subsystem path doe
 initialize or route it. Add BASS solicitation, callback routing, and receive-state updates
 without vendor source-selection opcodes.
 
-V1 authorizes one bonded research workstation on an encrypted connection opened through a
-physical-presence pairing window. Still validate all IDs, encodings, bounds, permissions,
-sizes, rates, queues, and timeouts on-device. Cancel work on disconnect or authorization
-loss, and never log secrets. Wearer, clinician, developer roles, and raw memory access are
-future authorization classes.
+The MVP trusts one workstation and does not require encryption, bonding, or physical presence.
+It still validates IDs, encodings, bounds, sizes, queue capacity, and transaction IDs on-device.
+Production authorization, roles, audit records, and raw-memory maintenance access remain
+future work.
 
 Audio deadlines take priority over management throughput. Keep buffers fixed, queues
 bounded, notifications rate-limited, and concurrency at one parameter operation until
@@ -157,9 +173,9 @@ stack, queue, controller-memory, and underrun measurements justify expansion.
 
 ## Delivery order
 
-1. Custom read-only service, authorized session, catalog, and Status.
-2. Versioned Request/Response/Event framing and volatile single-parameter access.
-3. Optional bulk transfer, maintenance apply, and persistent profiles.
+1. Implemented: custom service, catalog, Status, correlated access, and parameter persistence.
+2. Next: transactional DSP apply and hardware validation.
+3. Optional bulk transfer, maintenance apply, and whole-profile persistence.
 4. BASS/Scan Delegator integration and simultaneous control/broadcast testing.
 5. Production roles, audit-safe records, stress tests, and recovery hardening.
 

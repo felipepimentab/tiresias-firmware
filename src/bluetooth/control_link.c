@@ -7,6 +7,7 @@
 #include "control_link.h"
 
 #include "control_link_actions.h"
+#include "tiresias_service.h"
 #include "zbus_common.h"
 
 #include <zephyr/kernel.h>
@@ -60,6 +61,7 @@ static int set_state(control_link_state state)
 
   LOG_INF("State transition: %d -> %d", current_state, state);
   current_state = state;
+  tiresias_service_set_control_state(state);
 
   ret = zbus_chan_pub(&control_link_state_chan, &msg, K_MSEC(CONTROL_LINK_ZBUS_TIMEOUT_MS));
 
@@ -148,9 +150,18 @@ static void handle_bt_mgmt_event(void)
 
     advertising_start_pending = false;
     control_connection_index = msg->index;
-    ret = set_state(CONTROL_LINK_STATE_CONNECTED);
+    tiresias_service_on_connected(msg->conn);
+    ret = set_state(CONTROL_LINK_STATE_LINKED);
     if (ret != 0) {
-      LOG_ERR("Failed to publish CONNECTED state: %d", ret);
+      LOG_ERR("Failed to publish LINKED state: %d", ret);
+      enter_error(CONTROL_LINK_CMD_ENABLE_CONTROL, ret);
+      return;
+    }
+
+    /* Trusted-workstation MVP: an ACL is immediately authorized for the custom service. */
+    ret = set_state(CONTROL_LINK_STATE_READY);
+    if (ret != 0) {
+      LOG_ERR("Failed to publish READY state: %d", ret);
       enter_error(CONTROL_LINK_CMD_ENABLE_CONTROL, ret);
     }
     break;
@@ -160,6 +171,7 @@ static void handle_bt_mgmt_event(void)
       return;
     }
 
+    tiresias_service_on_disconnected(msg->conn);
     control_connection_index = UINT8_MAX;
     ret = control_link_actions_restart_advertising();
     if (ret != 0) {
@@ -230,7 +242,7 @@ static void handle_state_advertising(const struct zbus_channel* channel)
   }
 }
 
-static void handle_state_connected(const struct zbus_channel* channel)
+static void handle_state_linked_or_ready(const struct zbus_channel* channel)
 {
   if (channel == &control_link_cmd_chan) {
     reject_command(read_command());
@@ -258,8 +270,9 @@ static void control_link_state_machine(const struct zbus_channel* channel)
   case CONTROL_LINK_STATE_ADVERTISING:
     handle_state_advertising(channel);
     break;
-  case CONTROL_LINK_STATE_CONNECTED:
-    handle_state_connected(channel);
+  case CONTROL_LINK_STATE_LINKED:
+  case CONTROL_LINK_STATE_READY:
+    handle_state_linked_or_ready(channel);
     break;
   case CONTROL_LINK_STATE_ERROR:
     handle_state_error(channel);

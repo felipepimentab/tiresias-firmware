@@ -8,6 +8,7 @@
 
 #include "bt_mgmt.h"
 #include "control_link.h"
+#include "tiresias_service.h"
 
 #include <errno.h>
 #include <zephyr/bluetooth/uuid.h>
@@ -28,11 +29,19 @@ ZBUS_CHAN_DECLARE(led_chan);
 static const struct bt_data control_link_advertising_data[] = {
   BT_DATA_BYTES(BT_DATA_FLAGS, BT_LE_AD_GENERAL | BT_LE_AD_NO_BREDR),
   BT_DATA_BYTES(BT_DATA_UUID16_ALL, BT_UUID_16_ENCODE(BT_UUID_DIS_VAL)),
+  BT_DATA_BYTES(BT_DATA_UUID128_ALL, TIRESIAS_SERVICE_UUID),
 };
 
 int control_link_actions_enable(void)
 {
-  int ret = bt_mgmt_init();
+  int ret = tiresias_service_init();
+
+  if (ret != 0) {
+    return ret;
+  }
+
+  /* The service registers its settings handler before Bluetooth loads settings. */
+  ret = bt_mgmt_init();
 
   if (ret != 0) {
     return ret;
@@ -62,7 +71,8 @@ int control_link_actions_set_indicator(control_link_state state)
   case CONTROL_LINK_STATE_ADVERTISING:
     command = BLINK;
     break;
-  case CONTROL_LINK_STATE_CONNECTED:
+  case CONTROL_LINK_STATE_LINKED:
+  case CONTROL_LINK_STATE_READY:
     command = TURN_ON;
     break;
   case CONTROL_LINK_STATE_DISABLED:

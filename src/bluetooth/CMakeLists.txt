@@ -9,6 +9,7 @@ target_sources(app PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/audio_streaming_actions.c
     ${CMAKE_CURRENT_SOURCE_DIR}/control_link.c
     ${CMAKE_CURRENT_SOURCE_DIR}/control_link_actions.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/tiresias_service.c
 )
 
 add_subdirectory(bt_management)
