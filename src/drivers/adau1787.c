@@ -22,7 +22,7 @@ LOG_MODULE_REGISTER(adau1787_driver, LOG_LEVEL_INF);
 #define ADAU1787_SAFELOAD_DELAY_US 125U
 /* The exported safeload module contains data slots plus target and trigger parameters. */
 #define ADAU1787_SAFELOAD_MAX_WORDS (MOD_SAFELOADMODULE_COUNT - 2U)
-BUILD_ASSERT(PARAM_ADDR_IC_1_Sigma == 0x2000, "Param Memory Address must be 0x2000.");
+BUILD_ASSERT(PARAM_ADDR_IC_1_Sigma == ADAU1787_PARAM_RAM_BASE, "Param Memory Address must be set to 0x2000.");
 
 /** @brief Device Tree Specification for ADAU1787 */
 #define ADAU1787_NODE DT_NODELABEL(adau_1787)
