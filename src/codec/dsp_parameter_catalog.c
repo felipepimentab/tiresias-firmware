@@ -9,92 +9,87 @@
 #include "adau_1787_IC_1_SIGMA_PARAM.h"
 
 #include <errno.h>
+#include <limits.h>
+#include <stddef.h>
 #include <zephyr/sys/util.h>
 
 #define Q5_23_ONE 0x00800000
 #define Q5_23_FOUR 0x02000000
 #define Q5_23_STEP_1_256 0x00008000
-#define PARAMETER_ACCESS                                                                                               \
-  (DSP_PARAMETER_FLAG_READABLE | DSP_PARAMETER_FLAG_WRITABLE | DSP_PARAMETER_FLAG_PERSISTENT                           \
-      | DSP_PARAMETER_FLAG_LIVE_SAFE)
 
-static const struct dsp_parameter_descriptor parameters[] = {
-  {
-      .id = 1,
-      .flags = PARAMETER_ACCESS,
-      .encoding = DSP_PARAMETER_ENCODING_Q5_23,
-      .dsp_address = MOD_PHASE_COMP_GAIN1_GAIN1940ALGNS1_ADDR,
-      .word_count = 1,
-      .unit = DSP_PARAMETER_UNIT_LINEAR,
-      .minimum = 0,
-      .maximum = Q5_23_FOUR,
-      .default_value = Q5_23_ONE,
-      .step = Q5_23_STEP_1_256,
-      .name = "gain_1",
-  },
-  {
-      .id = 2,
-      .flags = PARAMETER_ACCESS,
-      .encoding = DSP_PARAMETER_ENCODING_Q5_23,
-      .dsp_address = MOD_PHASE_COMP_GAIN2_GAIN1940ALGNS2_ADDR,
-      .word_count = 1,
-      .unit = DSP_PARAMETER_UNIT_LINEAR,
-      .minimum = 0,
-      .maximum = Q5_23_FOUR,
-      .default_value = Q5_23_ONE,
-      .step = Q5_23_STEP_1_256,
-      .name = "gain_2",
-  },
-  {
-      .id = 3,
-      .flags = PARAMETER_ACCESS,
-      .encoding = DSP_PARAMETER_ENCODING_Q5_23,
-      .dsp_address = MOD_PHASE_COMP_GAIN3_GAIN1940ALGNS3_ADDR,
-      .word_count = 1,
-      .unit = DSP_PARAMETER_UNIT_LINEAR,
-      .minimum = 0,
-      .maximum = Q5_23_FOUR,
-      .default_value = Q5_23_ONE,
-      .step = Q5_23_STEP_1_256,
-      .name = "gain_3",
-  },
-  {
-      .id = 4,
-      .flags = PARAMETER_ACCESS,
-      .encoding = DSP_PARAMETER_ENCODING_Q5_23,
-      .dsp_address = MOD_OUTPUTHEADROOM_GAIN1940ALGNS4_ADDR,
-      .word_count = 1,
-      .unit = DSP_PARAMETER_UNIT_LINEAR,
-      .minimum = 0,
-      .maximum = Q5_23_FOUR,
-      .default_value = Q5_23_ONE,
-      .step = Q5_23_STEP_1_256,
-      .name = "headroom",
-  },
+const struct dsp_parameter dsp_parameter_contract[DSP_PARAMETER_CONTRACT_COUNT] = {
+  { DSP_PARAMETER_ID_ADC_SELECT, DSP_BLOCK_ID_ADC_SELECT, 1,
+      DSP_PARAMETER_CONTRACT_FLAG_WRITABLE | DSP_PARAMETER_CONTRACT_FLAG_INTEGER },
+  { DSP_PARAMETER_ID_SOURCE_SELECT, DSP_BLOCK_ID_SOURCE_SELECT, 1,
+      DSP_PARAMETER_CONTRACT_FLAG_WRITABLE | DSP_PARAMETER_CONTRACT_FLAG_INTEGER },
+  { DSP_PARAMETER_ID_BAND_1_COMPRESSOR_LUT, DSP_BLOCK_ID_BAND_1_COMPRESSOR, 34, 0 },
+  { DSP_PARAMETER_ID_BAND_2_COMPRESSOR_LUT, DSP_BLOCK_ID_BAND_2_COMPRESSOR, 34, 0 },
+  { DSP_PARAMETER_ID_BAND_3_COMPRESSOR_LUT, DSP_BLOCK_ID_BAND_3_COMPRESSOR, 34, 0 },
+  { DSP_PARAMETER_ID_BAND_4_COMPRESSOR_LUT, DSP_BLOCK_ID_BAND_4_COMPRESSOR, 34, 0 },
+  { DSP_PARAMETER_ID_BAND_5_COMPRESSOR_LUT, DSP_BLOCK_ID_BAND_5_COMPRESSOR, 34, 0 },
+  { DSP_PARAMETER_ID_BAND_6_COMPRESSOR_LUT, DSP_BLOCK_ID_BAND_6_COMPRESSOR, 34, 0 },
+  { DSP_PARAMETER_ID_BAND_7_COMPRESSOR_LUT, DSP_BLOCK_ID_BAND_7_COMPRESSOR, 34, 0 },
+  { DSP_PARAMETER_ID_BAND_8_COMPRESSOR_LUT, DSP_BLOCK_ID_BAND_8_COMPRESSOR, 34, 0 },
+  { DSP_PARAMETER_ID_PHASE_COMP_GAIN_1, DSP_BLOCK_ID_PHASE_COMP_GAIN_1, 1, DSP_PARAMETER_CONTRACT_FLAG_WRITABLE },
+  { DSP_PARAMETER_ID_PHASE_COMP_GAIN_2, DSP_BLOCK_ID_PHASE_COMP_GAIN_2, 1, DSP_PARAMETER_CONTRACT_FLAG_WRITABLE },
+  { DSP_PARAMETER_ID_PHASE_COMP_GAIN_3, DSP_BLOCK_ID_PHASE_COMP_GAIN_3, 1, DSP_PARAMETER_CONTRACT_FLAG_WRITABLE },
+  { DSP_PARAMETER_ID_OUTPUT_HEADROOM_GAIN, DSP_BLOCK_ID_OUTPUT_HEADROOM, 1, DSP_PARAMETER_CONTRACT_FLAG_WRITABLE },
+  { DSP_PARAMETER_ID_SOFT_CLIP_LUT, DSP_BLOCK_ID_SOFT_CLIP, 45, 0 },
 };
 
-BUILD_ASSERT(ARRAY_SIZE(parameters) == DSP_PARAMETER_CATALOG_COUNT, "Catalog count must match the wire contract");
-BUILD_ASSERT(MOD_PHASE_COMP_GAIN1_COUNT == 1 && MOD_PHASE_COMP_GAIN2_COUNT == 1 && MOD_PHASE_COMP_GAIN3_COUNT == 1
-        && MOD_OUTPUTHEADROOM_COUNT == 1,
-    "MVP parameters must be single DSP words");
-BUILD_ASSERT(MOD_PHASE_COMP_GAIN1_GAIN1940ALGNS1_ADDR % 4 == 0 && MOD_PHASE_COMP_GAIN2_GAIN1940ALGNS2_ADDR % 4 == 0
-        && MOD_PHASE_COMP_GAIN3_GAIN1940ALGNS3_ADDR % 4 == 0 && MOD_OUTPUTHEADROOM_GAIN1940ALGNS4_ADDR % 4 == 0,
-    "MVP DSP addresses must be word aligned");
+static const struct dsp_parameter_descriptor parameters[DSP_PARAMETER_CONTRACT_COUNT] = {
+  { &dsp_parameter_contract[0], MOD_ADCSELECT_MONOSWSLEW_ADDR, 0, 3, 0, 1 },
+  { &dsp_parameter_contract[1], MOD_SOURCESELECT_STEREOSWSLEW_ADDR, 0, 1, 1, 1 },
+  { &dsp_parameter_contract[2], MOD_COMPRESSOR_BANK_BAND1COMPRESSOR_ALG0_MONONOPOSTGAINSUB1TAB0_ADDR, INT32_MIN,
+      INT32_MAX, 0, 1 },
+  { &dsp_parameter_contract[3], MOD_COMPRESSOR_BANK_BAND2COMPRESSOR_ALG0_MONONOPOSTGAINSUB2TAB0_ADDR, INT32_MIN,
+      INT32_MAX, 0, 1 },
+  { &dsp_parameter_contract[4], MOD_COMPRESSOR_BANK_BAND3COMPRESSOR_ALG0_MONONOPOSTGAINSUB3TAB0_ADDR, INT32_MIN,
+      INT32_MAX, 0, 1 },
+  { &dsp_parameter_contract[5], MOD_COMPRESSOR_BANK_BAND4COMPRESSOR_ALG0_MONONOPOSTGAINSUB4TAB0_ADDR, INT32_MIN,
+      INT32_MAX, 0, 1 },
+  { &dsp_parameter_contract[6], MOD_COMPRESSOR_BANK_BAND5COMPRESSOR_ALG0_MONONOPOSTGAINSUB5TAB0_ADDR, INT32_MIN,
+      INT32_MAX, 0, 1 },
+  { &dsp_parameter_contract[7], MOD_COMPRESSOR_BANK_BAND6COMPRESSOR_ALG0_MONONOPOSTGAINSUB6TAB0_ADDR, INT32_MIN,
+      INT32_MAX, 0, 1 },
+  { &dsp_parameter_contract[8], MOD_COMPRESSOR_BANK_BAND7COMPRESSOR_ALG0_MONONOPOSTGAINSUB7TAB0_ADDR, INT32_MIN,
+      INT32_MAX, 0, 1 },
+  { &dsp_parameter_contract[9], MOD_COMPRESSOR_BANK_BAND8COMPRESSOR_ALG0_MONONOPOSTGAINSUB8TAB0_ADDR, INT32_MIN,
+      INT32_MAX, 0, 1 },
+  { &dsp_parameter_contract[10], MOD_PHASE_COMP_GAIN1_GAIN1940ALGNS1_ADDR, 0, Q5_23_FOUR, Q5_23_ONE, Q5_23_STEP_1_256 },
+  { &dsp_parameter_contract[11], MOD_PHASE_COMP_GAIN2_GAIN1940ALGNS2_ADDR, 0, Q5_23_FOUR, Q5_23_ONE, Q5_23_STEP_1_256 },
+  { &dsp_parameter_contract[12], MOD_PHASE_COMP_GAIN3_GAIN1940ALGNS3_ADDR, 0, Q5_23_FOUR, Q5_23_ONE, Q5_23_STEP_1_256 },
+  { &dsp_parameter_contract[13], MOD_OUTPUTHEADROOM_GAIN1940ALGNS4_ADDR, 0, Q5_23_FOUR, Q5_23_ONE, Q5_23_STEP_1_256 },
+  { &dsp_parameter_contract[14], MOD_SOFTCLIP_ALG0_GAINTABLE0_ADDR, INT32_MIN, INT32_MAX, 0, 1 },
+};
 
-const struct dsp_parameter_descriptor* dsp_parameter_catalog(void)
-{
-  return parameters;
-}
+BUILD_ASSERT(sizeof(struct dsp_parameter) == 4U, "The fixed contract fingerprint requires four-byte entries");
+BUILD_ASSERT(
+    ARRAY_SIZE(parameters) == DSP_PARAMETER_CONTRACT_COUNT, "Parameter bindings must match the fixed contract");
+BUILD_ASSERT(MOD_COMPRESSOR_BANK_BAND1COMPRESSOR_ALG0_DATA_ADR_ADDR
+            == MOD_COMPRESSOR_BANK_BAND1COMPRESSOR_ALG0_MONONOPOSTGAINSUB1TAB0_ADDR + 34U * sizeof(uint32_t)
+        && MOD_COMPRESSOR_BANK_BAND2COMPRESSOR_ALG0_DATA_ADR_ADDR
+            == MOD_COMPRESSOR_BANK_BAND2COMPRESSOR_ALG0_MONONOPOSTGAINSUB2TAB0_ADDR + 34U * sizeof(uint32_t)
+        && MOD_COMPRESSOR_BANK_BAND3COMPRESSOR_ALG0_DATA_ADR_ADDR
+            == MOD_COMPRESSOR_BANK_BAND3COMPRESSOR_ALG0_MONONOPOSTGAINSUB3TAB0_ADDR + 34U * sizeof(uint32_t)
+        && MOD_COMPRESSOR_BANK_BAND4COMPRESSOR_ALG0_DATA_ADR_ADDR
+            == MOD_COMPRESSOR_BANK_BAND4COMPRESSOR_ALG0_MONONOPOSTGAINSUB4TAB0_ADDR + 34U * sizeof(uint32_t)
+        && MOD_COMPRESSOR_BANK_BAND5COMPRESSOR_ALG0_DATA_ADR_ADDR
+            == MOD_COMPRESSOR_BANK_BAND5COMPRESSOR_ALG0_MONONOPOSTGAINSUB5TAB0_ADDR + 34U * sizeof(uint32_t)
+        && MOD_COMPRESSOR_BANK_BAND6COMPRESSOR_ALG0_DATA_ADR_ADDR
+            == MOD_COMPRESSOR_BANK_BAND6COMPRESSOR_ALG0_MONONOPOSTGAINSUB6TAB0_ADDR + 34U * sizeof(uint32_t)
+        && MOD_COMPRESSOR_BANK_BAND7COMPRESSOR_ALG0_DATA_ADR_ADDR
+            == MOD_COMPRESSOR_BANK_BAND7COMPRESSOR_ALG0_MONONOPOSTGAINSUB7TAB0_ADDR + 34U * sizeof(uint32_t)
+        && MOD_COMPRESSOR_BANK_BAND8COMPRESSOR_ALG0_DATA_ADR_ADDR
+            == MOD_COMPRESSOR_BANK_BAND8COMPRESSOR_ALG0_MONONOPOSTGAINSUB8TAB0_ADDR + 34U * sizeof(uint32_t),
+    "Compressor LUT bindings must cover exactly 34 DSP words");
+BUILD_ASSERT(MOD_SOFTCLIP_ALG0_HOLD_ADDR == MOD_SOFTCLIP_ALG0_GAINTABLE0_ADDR + 45U * sizeof(uint32_t),
+    "Soft Clip LUT binding must cover exactly 45 DSP words");
 
-size_t dsp_parameter_catalog_count(void)
-{
-  return ARRAY_SIZE(parameters);
-}
-
-const struct dsp_parameter_descriptor* dsp_parameter_find(uint16_t id)
+const struct dsp_parameter_descriptor* dsp_parameter_find(uint8_t id)
 {
   for (size_t index = 0; index < ARRAY_SIZE(parameters); index++) {
-    if (parameters[index].id == id) {
+    if (parameters[index].definition->id == id) {
       return &parameters[index];
     }
   }
@@ -102,20 +97,23 @@ const struct dsp_parameter_descriptor* dsp_parameter_find(uint16_t id)
   return NULL;
 }
 
-int dsp_parameter_validate(const struct dsp_parameter_descriptor* parameter, int32_t value)
+int dsp_parameter_validate(const struct dsp_parameter_descriptor* parameter, uint8_t word_index, int32_t value)
 {
   if (parameter == NULL) {
     return -ENOENT;
   }
-
-  if ((parameter->flags & DSP_PARAMETER_FLAG_WRITABLE) == 0U) {
+  if (word_index >= parameter->definition->word_count) {
+    return -ERANGE;
+  }
+  if ((parameter->definition->flags & DSP_PARAMETER_CONTRACT_FLAG_WRITABLE) == 0U) {
     return -EACCES;
   }
-
+  if (parameter->definition->word_count != 1U || word_index != 0U) {
+    return -EACCES;
+  }
   if (value < parameter->minimum || value > parameter->maximum) {
     return -ERANGE;
   }
-
   if (parameter->step > 0 && (value - parameter->minimum) % parameter->step != 0) {
     return -ERANGE;
   }

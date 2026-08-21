@@ -10,7 +10,6 @@
 #include "dsp_parameter_controller.h"
 
 #include <errno.h>
-#include <string.h>
 #include <zephyr/bluetooth/gatt.h>
 #include <zephyr/kernel.h>
 #include <zephyr/logging/log.h>
@@ -19,28 +18,28 @@
 #include <zephyr/sys/crc.h>
 #include <zephyr/sys/util.h>
 
+#define TIRESIAS_DSP_CAPABILITIES TIRESIAS_CAPABILITY_DSP_APPLY_DEFERRED
+#define TIRESIAS_DSP_STATUS_FLAGS TIRESIAS_STATUS_DSP_APPLY_DEFERRED
+
 #define TIRESIAS_CAPABILITIES                                                                                          \
   (TIRESIAS_CAPABILITY_GET_PARAMETER | TIRESIAS_CAPABILITY_SET_PARAMETER | TIRESIAS_CAPABILITY_PERSISTENCE             \
-      | TIRESIAS_CAPABILITY_DSP_APPLY_DEFERRED)
-#define TIRESIAS_CATALOG_SIZE (TIRESIAS_CATALOG_HEADER_SIZE + DSP_PARAMETER_CATALOG_COUNT * TIRESIAS_CATALOG_ENTRY_SIZE)
+      | TIRESIAS_DSP_CAPABILITIES)
 #define TIRESIAS_SERVICE_THREAD_STACK_SIZE 2048
 #define TIRESIAS_SERVICE_THREAD_PRIORITY 4
 
 LOG_MODULE_REGISTER(tiresias_service, CONFIG_LOG_DEFAULT_LEVEL);
 
-BUILD_ASSERT(TIRESIAS_CATALOG_SIZE == 144U, "MVP catalog size changed unexpectedly");
-
 struct tiresias_request {
   uint8_t opcode;
   uint32_t transaction_id;
-  uint16_t parameter_id;
+  uint8_t parameter_id;
+  uint8_t word_index;
   int32_t value;
   uint32_t session_id;
 };
 
 static struct bt_uuid_128 service_uuid = BT_UUID_INIT_128(TIRESIAS_SERVICE_UUID);
 static struct bt_uuid_128 protocol_info_uuid = BT_UUID_INIT_128(TIRESIAS_PROTOCOL_INFO_UUID);
-static struct bt_uuid_128 catalog_uuid = BT_UUID_INIT_128(TIRESIAS_PARAMETER_CATALOG_UUID);
 static struct bt_uuid_128 status_uuid = BT_UUID_INIT_128(TIRESIAS_STATUS_UUID);
 static struct bt_uuid_128 request_uuid = BT_UUID_INIT_128(TIRESIAS_REQUEST_UUID);
 static struct bt_uuid_128 response_uuid = BT_UUID_INIT_128(TIRESIAS_RESPONSE_UUID);
@@ -48,7 +47,6 @@ static struct bt_uuid_128 response_uuid = BT_UUID_INIT_128(TIRESIAS_RESPONSE_UUI
 static K_MUTEX_DEFINE(service_mutex);
 K_MSGQ_DEFINE(request_queue, sizeof(struct tiresias_request), 1, 4);
 
-static uint8_t catalog_wire[TIRESIAS_CATALOG_SIZE];
 static uint8_t response_wire[TIRESIAS_RESPONSE_SIZE];
 static struct bt_gatt_indicate_params response_indication;
 static struct bt_conn* control_conn;
@@ -59,48 +57,18 @@ enum request_phase {
   REQUEST_PHASE_INDICATING,
 };
 static atomic_t request_phase;
-static uint32_t catalog_crc;
 static uint32_t boot_id;
 static uint32_t active_session_id;
 static atomic_t control_state;
 static atomic_t last_transaction_id;
 static atomic_t last_parameter_id;
+static atomic_t last_word_index;
 static atomic_t last_result;
 static atomic_t last_set_persisted;
 static uint32_t status_revision;
 static bool service_initialized;
 
 extern const struct bt_gatt_attr attr_tiresias_gatt[];
-
-static void encode_catalog(void)
-{
-  const struct dsp_parameter_descriptor* catalog = dsp_parameter_catalog();
-  uint8_t* entry = &catalog_wire[TIRESIAS_CATALOG_HEADER_SIZE];
-
-  for (size_t index = 0; index < dsp_parameter_catalog_count(); index++, entry += TIRESIAS_CATALOG_ENTRY_SIZE) {
-    sys_put_le16(catalog[index].id, &entry[0]);
-    entry[2] = catalog[index].flags;
-    entry[3] = catalog[index].encoding;
-    sys_put_le16(catalog[index].dsp_address, &entry[4]);
-    entry[6] = catalog[index].word_count;
-    entry[7] = catalog[index].unit;
-    sys_put_le32((uint32_t)catalog[index].minimum, &entry[8]);
-    sys_put_le32((uint32_t)catalog[index].maximum, &entry[12]);
-    sys_put_le32((uint32_t)catalog[index].default_value, &entry[16]);
-    sys_put_le32((uint32_t)catalog[index].step, &entry[20]);
-    memcpy(&entry[24], catalog[index].name, sizeof(catalog[index].name));
-  }
-
-  catalog_crc
-      = crc32_ieee(&catalog_wire[TIRESIAS_CATALOG_HEADER_SIZE], TIRESIAS_CATALOG_SIZE - TIRESIAS_CATALOG_HEADER_SIZE);
-  catalog_wire[0] = 1U;
-  catalog_wire[1] = TIRESIAS_CATALOG_ENTRY_SIZE;
-  sys_put_le16(DSP_PARAMETER_CATALOG_COUNT, &catalog_wire[2]);
-  sys_put_le16(TIRESIAS_CATALOG_SIZE, &catalog_wire[4]);
-  sys_put_le16(0U, &catalog_wire[6]);
-  sys_put_le32(DSP_PARAMETER_LAYOUT_ID, &catalog_wire[8]);
-  sys_put_le32(catalog_crc, &catalog_wire[12]);
-}
 
 static void encode_protocol_info(uint8_t data[TIRESIAS_PROTOCOL_INFO_SIZE])
 {
@@ -110,17 +78,17 @@ static void encode_protocol_info(uint8_t data[TIRESIAS_PROTOCOL_INFO_SIZE])
   sys_put_le32(TIRESIAS_CAPABILITIES, &data[4]);
   sys_put_le16(TIRESIAS_REQUEST_SIZE, &data[8]);
   sys_put_le16(TIRESIAS_RESPONSE_SIZE, &data[10]);
-  sys_put_le16(TIRESIAS_CATALOG_ENTRY_SIZE, &data[12]);
-  sys_put_le16(DSP_PARAMETER_CATALOG_COUNT, &data[14]);
-  sys_put_le32(DSP_PARAMETER_LAYOUT_ID, &data[16]);
-  sys_put_le32(catalog_crc, &data[20]);
+  sys_put_le16(DSP_PARAMETER_CONTRACT_VERSION, &data[12]);
+  sys_put_le16(DSP_PARAMETER_CONTRACT_COUNT, &data[14]);
+  sys_put_le32(DSP_PARAMETER_CONTRACT_ID, &data[16]);
+  sys_put_le32(DSP_PARAMETER_CONTRACT_CRC32, &data[20]);
   sys_put_le32(boot_id, &data[24]);
   sys_put_le32(dsp_parameter_controller_revision(), &data[28]);
 }
 
 static int encode_status(uint8_t data[TIRESIAS_STATUS_SIZE])
 {
-  uint8_t flags = TIRESIAS_STATUS_DSP_APPLY_DEFERRED;
+  uint8_t flags = TIRESIAS_DSP_STATUS_FLAGS;
 
   if (dsp_parameter_controller_loaded()) {
     flags |= TIRESIAS_STATUS_PARAMETERS_LOADED;
@@ -139,7 +107,8 @@ static int encode_status(uint8_t data[TIRESIAS_STATUS_SIZE])
   data[3] = 0U;
   sys_put_le32(status_revision, &data[4]);
   sys_put_le32((uint32_t)atomic_get(&last_transaction_id), &data[8]);
-  sys_put_le16((uint16_t)atomic_get(&last_parameter_id), &data[12]);
+  data[12] = (uint8_t)atomic_get(&last_parameter_id);
+  data[13] = (uint8_t)atomic_get(&last_word_index);
   sys_put_le16(0U, &data[14]);
   k_mutex_unlock(&service_mutex);
 
@@ -153,12 +122,6 @@ static ssize_t read_protocol_info(
 
   encode_protocol_info(data);
   return bt_gatt_attr_read(conn, attr, buf, len, offset, data, sizeof(data));
-}
-
-static ssize_t read_catalog(
-    struct bt_conn* conn, const struct bt_gatt_attr* attr, void* buf, uint16_t len, uint16_t offset)
-{
-  return bt_gatt_attr_read(conn, attr, buf, len, offset, catalog_wire, sizeof(catalog_wire));
 }
 
 static ssize_t read_status(
@@ -190,11 +153,12 @@ static ssize_t write_request(struct bt_conn* conn, const struct bt_gatt_attr* at
     return BT_GATT_ERR(BT_ATT_ERR_VALUE_NOT_ALLOWED);
   }
 
-  if (sys_get_le32(&data[2]) == 0U || (data[0] == TIRESIAS_OPCODE_GET_PARAMETER && sys_get_le32(&data[8]) != 0U)) {
+  if (sys_get_le32(&data[2]) == 0U || data[6] == 0U
+      || (data[0] == TIRESIAS_OPCODE_GET_PARAMETER && sys_get_le32(&data[8]) != 0U)) {
     return BT_GATT_ERR(BT_ATT_ERR_VALUE_NOT_ALLOWED);
   }
 
-  if (!bt_gatt_is_subscribed(conn, &attr_tiresias_gatt[11], BT_GATT_CCC_INDICATE)) {
+  if (!bt_gatt_is_subscribed(conn, &attr_tiresias_gatt[9], BT_GATT_CCC_INDICATE)) {
     return BT_GATT_ERR(BT_ATT_ERR_CCC_IMPROPER_CONF);
   }
 
@@ -214,7 +178,8 @@ static ssize_t write_request(struct bt_conn* conn, const struct bt_gatt_attr* at
 
   request.opcode = data[0];
   request.transaction_id = sys_get_le32(&data[2]);
-  request.parameter_id = sys_get_le16(&data[6]);
+  request.parameter_id = data[6];
+  request.word_index = data[7];
   request.value = (int32_t)sys_get_le32(&data[8]);
 
   if (k_msgq_put(&request_queue, &request, K_NO_WAIT) != 0) {
@@ -228,7 +193,6 @@ static ssize_t write_request(struct bt_conn* conn, const struct bt_gatt_attr* at
 BT_GATT_SERVICE_DEFINE(tiresias_gatt, BT_GATT_PRIMARY_SERVICE(&service_uuid),
     BT_GATT_CHARACTERISTIC(
         &protocol_info_uuid.uuid, BT_GATT_CHRC_READ, BT_GATT_PERM_READ, read_protocol_info, NULL, NULL),
-    BT_GATT_CHARACTERISTIC(&catalog_uuid.uuid, BT_GATT_CHRC_READ, BT_GATT_PERM_READ, read_catalog, NULL, NULL),
     BT_GATT_CHARACTERISTIC(
         &status_uuid.uuid, BT_GATT_CHRC_READ | BT_GATT_CHRC_NOTIFY, BT_GATT_PERM_READ, read_status, NULL, NULL),
     BT_GATT_CCC(NULL, BT_GATT_PERM_READ | BT_GATT_PERM_WRITE),
@@ -249,6 +213,8 @@ static enum tiresias_result map_result(int error, bool setting)
     return TIRESIAS_RESULT_OUT_OF_RANGE;
   case -EINVAL:
     return TIRESIAS_RESULT_BAD_REQUEST;
+  case -EREMOTE:
+    return TIRESIAS_RESULT_DSP_FAILED;
   default:
     return setting ? TIRESIAS_RESULT_PERSIST_FAILED : TIRESIAS_RESULT_INTERNAL;
   }
@@ -300,14 +266,14 @@ static void send_status_notification(struct bt_conn* conn)
   uint8_t status[TIRESIAS_STATUS_SIZE];
   int ret;
 
-  if (!bt_gatt_is_subscribed(conn, &attr_tiresias_gatt[6], BT_GATT_CCC_NOTIFY)) {
+  if (!bt_gatt_is_subscribed(conn, &attr_tiresias_gatt[4], BT_GATT_CCC_NOTIFY)) {
     return;
   }
 
   if (encode_status(status) != 0) {
     return;
   }
-  ret = bt_gatt_notify(conn, &attr_tiresias_gatt[6], status, sizeof(status));
+  ret = bt_gatt_notify(conn, &attr_tiresias_gatt[4], status, sizeof(status));
   if (ret != 0) {
     LOG_DBG("Status notification was not delivered: %d", ret);
   }
@@ -328,15 +294,16 @@ static void process_request(const struct tiresias_request* request)
   }
 
   if (setting) {
-    ret = dsp_parameter_controller_set(request->parameter_id, value, &revision);
+    ret = dsp_parameter_controller_set(request->parameter_id, request->word_index, value, &revision);
   } else {
-    ret = dsp_parameter_controller_get(request->parameter_id, &value, &revision);
+    ret = dsp_parameter_controller_get(request->parameter_id, request->word_index, &value, &revision);
   }
   result = map_result(ret, setting);
 
   k_mutex_lock(&service_mutex, K_FOREVER);
   atomic_set(&last_transaction_id, (atomic_val_t)request->transaction_id);
   atomic_set(&last_parameter_id, request->parameter_id);
+  atomic_set(&last_word_index, request->word_index);
   atomic_set(&last_result, result);
   if (setting) {
     atomic_set(&last_set_persisted, result == TIRESIAS_RESULT_OK);
@@ -347,7 +314,8 @@ static void process_request(const struct tiresias_request* request)
   response_wire[0] = request->opcode;
   response_wire[1] = result;
   sys_put_le32(request->transaction_id, &response_wire[2]);
-  sys_put_le16(request->parameter_id, &response_wire[6]);
+  response_wire[6] = request->parameter_id;
+  response_wire[7] = request->word_index;
   sys_put_le32((uint32_t)value, &response_wire[8]);
   sys_put_le32(revision, &response_wire[12]);
 
@@ -360,7 +328,7 @@ static void process_request(const struct tiresias_request* request)
     return;
   }
 
-  response_indication.attr = &attr_tiresias_gatt[11];
+  response_indication.attr = &attr_tiresias_gatt[9];
   response_indication.func = indication_complete;
   response_indication.destroy = indication_destroy;
   response_indication.data = response_wire;
@@ -397,6 +365,7 @@ K_THREAD_DEFINE(tiresias_service_thread_id, TIRESIAS_SERVICE_THREAD_STACK_SIZE, 
 
 int tiresias_service_init(void)
 {
+  uint32_t contract_crc;
   int ret;
 
   if (service_initialized) {
@@ -408,11 +377,12 @@ int tiresias_service_init(void)
     return ret;
   }
 
-  encode_catalog();
-  if (catalog_crc != TIRESIAS_CATALOG_CRC32) {
-    LOG_ERR("Catalog golden CRC mismatch: 0x%08x", catalog_crc);
+  contract_crc = crc32_ieee((const uint8_t*)dsp_parameter_contract, sizeof(dsp_parameter_contract));
+  if (contract_crc != DSP_PARAMETER_CONTRACT_CRC32) {
+    LOG_ERR("DSP contract CRC mismatch: 0x%08x", contract_crc);
     return -EINVAL;
   }
+
   boot_id = k_cycle_get_32();
   service_initialized = true;
   return 0;

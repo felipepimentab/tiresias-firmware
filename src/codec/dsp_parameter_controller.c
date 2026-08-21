@@ -6,7 +6,7 @@
 
 #include "dsp_parameter_controller.h"
 
-#include "dsp_parameter_apply.h"
+#include "codec_adapter.h"
 #include "dsp_parameter_catalog.h"
 
 #include <errno.h>
@@ -21,44 +21,103 @@
 
 #define SETTINGS_KEY "tiresias/parameters"
 #define STORE_MAGIC 0x54525053U
-#define STORE_VERSION 1U
+#define STORE_VERSION 2U
 #define STORE_HEADER_SIZE 20U
 #define STORE_CRC_SIZE 4U
-#define STORE_SIZE (STORE_HEADER_SIZE + DSP_PARAMETER_CATALOG_COUNT * sizeof(int32_t) + STORE_CRC_SIZE)
+#define STORE_SIZE (STORE_HEADER_SIZE + DSP_PARAMETER_PERSISTENT_COUNT * sizeof(int32_t) + STORE_CRC_SIZE)
 
 LOG_MODULE_REGISTER(dsp_parameter_controller, CONFIG_LOG_DEFAULT_LEVEL);
 
-BUILD_ASSERT(STORE_SIZE == 40U, "Persistent DSP parameter record changed unexpectedly");
+BUILD_ASSERT(STORE_SIZE == 48U, "Persistent DSP parameter record changed unexpectedly");
+
+static const uint8_t persistent_ids[DSP_PARAMETER_PERSISTENT_COUNT] = {
+  DSP_PARAMETER_ID_ADC_SELECT,
+  DSP_PARAMETER_ID_SOURCE_SELECT,
+  DSP_PARAMETER_ID_PHASE_COMP_GAIN_1,
+  DSP_PARAMETER_ID_PHASE_COMP_GAIN_2,
+  DSP_PARAMETER_ID_PHASE_COMP_GAIN_3,
+  DSP_PARAMETER_ID_OUTPUT_HEADROOM_GAIN,
+};
 
 static K_MUTEX_DEFINE(parameter_mutex);
-static int32_t values[DSP_PARAMETER_CATALOG_COUNT];
+static int32_t values[DSP_PARAMETER_PERSISTENT_COUNT];
 static atomic_t current_revision;
 static bool initialized;
 static atomic_t settings_loaded;
 
+static size_t persistent_index(uint8_t id)
+{
+  for (size_t index = 0; index < ARRAY_SIZE(persistent_ids); index++) {
+    if (persistent_ids[index] == id) {
+      return index;
+    }
+  }
+
+  return ARRAY_SIZE(persistent_ids);
+}
+
+static int read_parameter_word(const struct dsp_parameter_descriptor* parameter, uint8_t word_index, int32_t* value)
+{
+  uint8_t word[CODEC_PARAMETER_WORD_SIZE];
+  uint32_t raw;
+  int ret;
+
+  ret = codec_param_read(parameter->dsp_address + word_index * sizeof(word), word, sizeof(word));
+  if (ret != 0) {
+    return ret == -ENOTSUP ? ret : -EREMOTE;
+  }
+
+  raw = sys_get_be32(word);
+  if ((parameter->definition->flags & DSP_PARAMETER_CONTRACT_FLAG_INTEGER) == 0U) {
+    raw &= 0x0FFFFFFFU;
+    if ((raw & BIT(27)) != 0U) {
+      raw |= 0xF0000000U;
+    }
+  }
+  *value = (int32_t)raw;
+
+  return 0;
+}
+
+static int write_parameter_word(const struct dsp_parameter_descriptor* parameter, int32_t value)
+{
+  uint8_t word[CODEC_PARAMETER_WORD_SIZE];
+  uint32_t raw = (uint32_t)value;
+  int ret;
+
+  if ((parameter->definition->flags & DSP_PARAMETER_CONTRACT_FLAG_INTEGER) == 0U) {
+    raw &= 0x0FFFFFFFU;
+  }
+  sys_put_be32(raw, word);
+
+  ret = codec_param_write(parameter->dsp_address, word, sizeof(word));
+  return ret == 0 || ret == -ENOTSUP ? ret : -EREMOTE;
+}
+
 static void load_defaults(void)
 {
-  const struct dsp_parameter_descriptor* catalog = dsp_parameter_catalog();
+  for (size_t index = 0; index < ARRAY_SIZE(persistent_ids); index++) {
+    const struct dsp_parameter_descriptor* parameter = dsp_parameter_find(persistent_ids[index]);
 
-  for (size_t index = 0; index < dsp_parameter_catalog_count(); index++) {
-    values[index] = catalog[index].default_value;
+    __ASSERT_NO_MSG(parameter != NULL);
+    values[index] = parameter->default_value;
   }
 
   atomic_clear(&current_revision);
 }
 
 static void encode_store(
-    uint8_t blob[STORE_SIZE], const int32_t stored_values[DSP_PARAMETER_CATALOG_COUNT], uint32_t revision)
+    uint8_t blob[STORE_SIZE], const int32_t stored_values[DSP_PARAMETER_PERSISTENT_COUNT], uint32_t revision)
 {
   sys_put_le32(STORE_MAGIC, &blob[0]);
   sys_put_le16(STORE_VERSION, &blob[4]);
   sys_put_le16(STORE_SIZE, &blob[6]);
-  sys_put_le32(DSP_PARAMETER_LAYOUT_ID, &blob[8]);
+  sys_put_le32(DSP_PARAMETER_CONTRACT_ID, &blob[8]);
   sys_put_le32(revision, &blob[12]);
-  sys_put_le16(DSP_PARAMETER_CATALOG_COUNT, &blob[16]);
+  sys_put_le16(DSP_PARAMETER_PERSISTENT_COUNT, &blob[16]);
   sys_put_le16(0U, &blob[18]);
 
-  for (size_t index = 0; index < DSP_PARAMETER_CATALOG_COUNT; index++) {
+  for (size_t index = 0; index < DSP_PARAMETER_PERSISTENT_COUNT; index++) {
     sys_put_le32((uint32_t)stored_values[index], &blob[STORE_HEADER_SIZE + index * sizeof(int32_t)]);
   }
 
@@ -67,24 +126,23 @@ static void encode_store(
 
 static int decode_store(const uint8_t blob[STORE_SIZE])
 {
-  const struct dsp_parameter_descriptor* catalog = dsp_parameter_catalog();
   uint32_t expected_crc = sys_get_le32(&blob[STORE_SIZE - STORE_CRC_SIZE]);
 
   if (sys_get_le32(&blob[0]) != STORE_MAGIC || sys_get_le16(&blob[4]) != STORE_VERSION
-      || sys_get_le16(&blob[6]) != STORE_SIZE || sys_get_le32(&blob[8]) != DSP_PARAMETER_LAYOUT_ID
-      || sys_get_le16(&blob[16]) != DSP_PARAMETER_CATALOG_COUNT
+      || sys_get_le16(&blob[6]) != STORE_SIZE || sys_get_le32(&blob[8]) != DSP_PARAMETER_CONTRACT_ID
+      || sys_get_le16(&blob[16]) != DSP_PARAMETER_PERSISTENT_COUNT
       || crc32_ieee(blob, STORE_SIZE - STORE_CRC_SIZE) != expected_crc) {
     return -EINVAL;
   }
 
-  for (size_t index = 0; index < DSP_PARAMETER_CATALOG_COUNT; index++) {
+  for (size_t index = 0; index < DSP_PARAMETER_PERSISTENT_COUNT; index++) {
+    const struct dsp_parameter_descriptor* parameter = dsp_parameter_find(persistent_ids[index]);
     int32_t value = (int32_t)sys_get_le32(&blob[STORE_HEADER_SIZE + index * sizeof(int32_t)]);
-    int ret = dsp_parameter_validate(&catalog[index], value);
+    int ret = dsp_parameter_validate(parameter, 0U, value);
 
     if (ret != 0) {
       return ret;
     }
-
     values[index] = value;
   }
 
@@ -150,11 +208,6 @@ int dsp_parameter_controller_init(void)
     return ret;
   }
 
-  /*
-   * Load this module's state explicitly so readiness does not depend on which
-   * Bluetooth subsystem happens to perform the process-wide settings load
-   * first. An empty subtree is a valid first boot and commits the defaults.
-   */
   ret = settings_load_subtree(parameter_settings.name);
   if (ret != 0) {
     return ret;
@@ -164,9 +217,10 @@ int dsp_parameter_controller_init(void)
   return 0;
 }
 
-int dsp_parameter_controller_get(uint16_t id, int32_t* value, uint32_t* revision)
+int dsp_parameter_controller_get(uint8_t id, uint8_t word_index, int32_t* value, uint32_t* revision)
 {
   const struct dsp_parameter_descriptor* parameter = dsp_parameter_find(id);
+  int ret;
 
   if (parameter == NULL) {
     return -ENOENT;
@@ -174,59 +228,86 @@ int dsp_parameter_controller_get(uint16_t id, int32_t* value, uint32_t* revision
   if (value == NULL || revision == NULL) {
     return -EINVAL;
   }
+  if (word_index >= parameter->definition->word_count) {
+    return -ERANGE;
+  }
 
   k_mutex_lock(&parameter_mutex, K_FOREVER);
-  *value = values[parameter - dsp_parameter_catalog()];
+  ret = read_parameter_word(parameter, word_index, value);
+  if (ret == -ENOTSUP) {
+    size_t index = persistent_index(id);
+
+    if (word_index == 0U && index < ARRAY_SIZE(values)) {
+      *value = values[index];
+      ret = 0;
+    } else {
+      ret = -EREMOTE;
+    }
+  }
   *revision = (uint32_t)atomic_get(&current_revision);
   k_mutex_unlock(&parameter_mutex);
 
-  return 0;
+  return ret;
 }
 
-int dsp_parameter_controller_set(uint16_t id, int32_t value, uint32_t* revision)
+int dsp_parameter_controller_set(uint8_t id, uint8_t word_index, int32_t value, uint32_t* revision)
 {
   const struct dsp_parameter_descriptor* parameter = dsp_parameter_find(id);
-  int32_t pending_values[DSP_PARAMETER_CATALOG_COUNT];
+  int32_t pending_values[DSP_PARAMETER_PERSISTENT_COUNT];
   uint8_t blob[STORE_SIZE];
   size_t index;
   uint32_t pending_revision;
+  bool codec_applied;
+  int rollback_ret;
   int ret;
 
   if (revision == NULL) {
     return -EINVAL;
   }
 
-  ret = dsp_parameter_validate(parameter, value);
+  ret = dsp_parameter_validate(parameter, word_index, value);
   if (ret != 0) {
     return ret;
   }
 
-  index = parameter - dsp_parameter_catalog();
+  index = persistent_index(id);
+  if (index >= ARRAY_SIZE(values)) {
+    return -EINVAL;
+  }
+
   k_mutex_lock(&parameter_mutex, K_FOREVER);
+  ret = write_parameter_word(parameter, value);
+  codec_applied = ret == 0;
+  if (ret != 0 && ret != -ENOTSUP) {
+    k_mutex_unlock(&parameter_mutex);
+    LOG_ERR("Failed to write codec parameter %u: %d", id, ret);
+    return ret;
+  }
+
   memcpy(pending_values, values, sizeof(pending_values));
   pending_values[index] = value;
   pending_revision = (uint32_t)atomic_get(&current_revision) + 1U;
   encode_store(blob, pending_values, pending_revision);
 
   ret = settings_save_one(SETTINGS_KEY, blob, sizeof(blob));
-  if (ret == 0) {
-    memcpy(values, pending_values, sizeof(values));
-    atomic_set(&current_revision, (atomic_val_t)pending_revision);
-    *revision = pending_revision;
-  }
-  k_mutex_unlock(&parameter_mutex);
-
   if (ret != 0) {
+    if (codec_applied) {
+      rollback_ret = write_parameter_word(parameter, values[index]);
+      if (rollback_ret != 0) {
+        LOG_ERR("Failed to roll back codec parameter %u: %d", id, rollback_ret);
+      }
+    }
+    k_mutex_unlock(&parameter_mutex);
     LOG_ERR("Failed to persist DSP parameter %u: %d", id, ret);
     return ret;
   }
 
-  ret = dsp_parameter_apply(parameter, value);
-  if (ret != 0) {
-    LOG_ERR("Failed to apply persisted DSP parameter %u: %d", id, ret);
-  }
+  memcpy(values, pending_values, sizeof(values));
+  atomic_set(&current_revision, (atomic_val_t)pending_revision);
+  *revision = pending_revision;
+  k_mutex_unlock(&parameter_mutex);
 
-  return ret;
+  return 0;
 }
 
 uint32_t dsp_parameter_controller_revision(void)

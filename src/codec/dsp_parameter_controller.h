@@ -11,8 +11,8 @@
 #include <stdint.h>
 
 int dsp_parameter_controller_init(void);
-int dsp_parameter_controller_get(uint16_t id, int32_t* value, uint32_t* revision);
-int dsp_parameter_controller_set(uint16_t id, int32_t value, uint32_t* revision);
+int dsp_parameter_controller_get(uint8_t id, uint8_t word_index, int32_t* value, uint32_t* revision);
+int dsp_parameter_controller_set(uint8_t id, uint8_t word_index, int32_t value, uint32_t* revision);
 uint32_t dsp_parameter_controller_revision(void);
 bool dsp_parameter_controller_loaded(void);
 

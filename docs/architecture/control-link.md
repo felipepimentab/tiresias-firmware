@@ -3,15 +3,14 @@
 ## Status
 
 Implemented MVP: shared Bluetooth initialization, connectable advertising, one peripheral
-ACL, Device Information Service, the custom Tiresias service, cataloged parameter access,
-internal-flash persistence, advertising restart, and LED 1 indication. DSP writes are an
-explicit no-op boundary until hardware validation is available.
+ACL, Device Information Service, the custom Tiresias service, fixed-contract parameter
+access, scalar internal-flash persistence, advertising restart, and LED 1 indication.
 
 ## Service boundaries
 
 | Service | Responsibility |
 |---|---|
-| Tiresias Control Link | Product-specific commands, status, events, and cataloged parameters |
+| Tiresias Control Link | Product-specific commands, status, events, and fixed DSP parameters |
 | Device Information Service | Standard static identity; implemented |
 | BASS | Standard Broadcast Assistant procedures |
 | MCUmgr/SMP | Firmware update; do not duplicate in the custom service |
@@ -24,8 +23,8 @@ materially different lifecycle, authorization boundary, or sustained data rate.
 ## Ownership
 
 Control Link owns the remote session, negotiation, authorization, wire-protocol parsing,
-transaction IDs, response delivery, remote status aggregation, parameter-catalog exposure,
-and disconnect cancellation.
+transaction IDs, response delivery, remote status aggregation, contract identification, and
+disconnect cancellation.
 
 It does not own Bluetooth stack setup, ADAU1787 access, device/audio policy, broadcast
 synchronization, BASS state, firmware update, or audio buffers. These belong to Bluetooth
@@ -56,15 +55,14 @@ supports one incoming control/Broadcast Assistant ACL.
 ## Custom service
 
 The service UUID is `7b9a0001-6e4f-4b2d-a9c8-4f2e6f5d1000`. Characteristic UUIDs replace
-`0001` with `0002` through `0006` in table order:
+`0001` as listed below; `0003` is reserved after removal of the protocol-v1 catalog:
 
 | Characteristic | Properties | Content |
 |---|---|---|
-| Protocol Information (`0002`) | Read | Versions, capabilities, limits, layout ID, boot ID, revision |
-| Parameter Catalog (`0003`) | Read with offsets | Stable IDs, codec addresses, formats, bounds, units, flags |
+| Protocol Information (`0002`) | Read | Versions, capabilities, limits, contract identity, boot ID, revision |
 | Status (`0004`) | Read, Notify | Control state, persistence state, and last operation |
-| Request (`0005`) | Write | One correlated parameter operation |
-| Response (`0006`) | Indicate | Correlated terminal result |
+| Request (`0005`) | Write | One correlated indexed-word operation |
+| Response (`0006`) | Indicate | Correlated indexed-word result |
 
 Wire values have explicit widths and byte order; never expose native C structures. Major
 versions break compatibility, minor versions add compatible fields, and capabilities gate
@@ -74,31 +72,33 @@ All integers are little-endian. Wire layouts are fixed and encoded field by fiel
 
 | Value | Size | Layout |
 |---|---:|---|
-| Protocol Information | 32 | `u8 major, u8 minor, u16 length, u32 capabilities, u16 max_request, u16 max_response, u16 entry_size, u16 entry_count, u32 layout_id, u32 catalog_crc, u32 boot_id, u32 revision` |
-| Catalog header | 16 | `u8 version, u8 entry_size, u16 count, u16 total_length, u16 reserved, u32 layout_id, u32 entries_crc` |
-| Catalog entry | 32 | `u16 id, u8 flags, u8 encoding, u16 address, u8 words, u8 unit, i32 min, i32 max, i32 default, i32 step, char name[8]` |
-| Request | 12 | `u8 opcode, u8 flags, u32 transaction_id, u16 parameter_id, i32 value` |
-| Response | 16 | `u8 opcode, u8 result, u32 transaction_id, u16 parameter_id, i32 value, u32 revision` |
-| Status | 16 | `u8 state, u8 flags, u8 last_result, u8 reserved, u32 revision, u32 last_transaction_id, u16 last_parameter_id, u16 reserved` |
+| Protocol Information | 32 | `u8 major, u8 minor, u16 length, u32 capabilities, u16 max_request, u16 max_response, u16 contract_version, u16 parameter_count, u32 contract_id, u32 contract_crc, u32 boot_id, u32 revision` |
+| Request | 12 | `u8 opcode, u8 flags, u32 transaction_id, u8 parameter_id, u8 word_index, i32 value` |
+| Response | 16 | `u8 opcode, u8 result, u32 transaction_id, u8 parameter_id, u8 word_index, i32 value, u32 revision` |
+| Status | 16 | `u8 state, u8 flags, u8 last_result, u8 reserved, u32 revision, u32 last_transaction_id, u8 last_parameter_id, u8 last_word_index, u16 reserved` |
 
 Protocol constants and result values are public in `tiresias_service.h`. Transaction ID zero,
 nonzero flags, and nonzero GET values are invalid. CCC, readiness, malformed-length, and busy
 failures are rejected at ATT admission; every accepted request completes with one indication
-using the same nonzero transaction ID while the session remains connected. The current catalog
-golden CRC32 is `0xdfac5b27`.
+using the same nonzero transaction ID while the session remains connected. Protocol v2 uses
+contract ID `0x54525001`, contract version `1`, 15 parameters, and CRC32 `0xf62c1808`.
 
-## Parameter catalog
+## Fixed DSP contract
 
-The build-time catalog is the complete V1 allowlist. Each entry includes:
+Firmware and workstation compile the same MVP contract. Its public fingerprint is the CRC32
+of the ordered four-byte entries `parameter_id, block_id, word_count, flags`. Membership
+implies readable Q5.23 data; the writable and integer properties are opt-in flags. Names,
+constraints, and GUI grouping live in the workstation contract, while DSP addresses and
+hardware conversion remain private to firmware.
 
-- stable ID and current ADAU1787 byte address;
-- word count, encoding, scale, and byte order;
-- bounds, optional step or enum choices, and units;
-- readable, writable, persistent, and live-update-safe flags.
+The fixed parameters are ADC Select, Source Select, eight 34-word compressor LUTs, three
+phase-compensation gains, Output Headroom Gain, and the 45-word Soft Clip LUT. The selectors
+are writable integers. The four gains are writable Q5.23 scalars from 0 through 4 in steps of
+1/256. LUTs are readable and remain read-only until an atomic multiword write protocol exists.
 
-The remote catalog and lookup table share one immutable descriptor array tied to the current
-SigmaStudio export. The firmware never parses a host-provided map; build assertions protect
-the fixed catalog count, DSP word size, address alignment, and wire size.
+The client identifies a word with `(parameter_id, word_index)`. It reads every index from zero
+through `word_count - 1` to assemble a multiword value. Each word receives its own transaction
+ID and correlated indication; revision must remain stable across the assembled read.
 
 Normal requests use stable IDs. Control Link validates framing, readiness, size, and queue
 capacity. The DSP parameter controller independently resolves the entry and validates access,
@@ -107,21 +107,27 @@ range, and step before persistence.
 MVP constraints:
 
 - one outstanding parameter operation;
-- one parameter per correlated `GET_PARAMETER` or `SET_PARAMETER` request;
-- only cataloged, live-update-safe writes;
-- every successful SET is committed as one versioned, layout-bound, CRC-checked settings
+- one DSP word per correlated `GET_PARAMETER` or `SET_PARAMETER` request;
+- only the six fixed scalar controls are writable and persisted;
+- every successful SET is committed as one versioned, contract-bound, CRC-checked settings
   record before RAM state and revision advance;
 - the parameter controller loads its own settings subtree during initialization, so an empty
-  first boot commits catalog defaults and readiness is independent of Bluetooth startup order;
-- the exact Q5.23 step is `1/256`; values outside the catalog range or off-step are rejected;
+  first boot loads contract defaults and readiness is independent of Bluetooth startup order;
+- values outside their fixed range or off-step are rejected;
 - no raw RAM/register access, batch atomicity, or whole-profile replacement.
 
-The current catalog contains three phase-compensation gains and output headroom. The DSP
-adapter is intentionally empty, so success currently means the flash commit completed, not
-that hardware changed. Before real DSP writes are enabled, SET must be redesigned as a
-transaction that defines apply failure, rollback, and flash/DSP power-loss reconciliation.
+Codec parameter I/O goes through Codec Adapter, the common boundary directly above the
+ADAU1787 driver. Its parameter read/write operations are stubs until hardware behavior can be
+validated. The controller therefore returns cached values for the six persistent scalars,
+reports DSP failure for LUT reads, persists scalar writes without applying them, and advertises
+deferred DSP access. A future adapter implementation must define write atomicity and rollback
+before the deferred flag is removed.
 
-Future bulk transfers use a session ID, transaction ID, layout ID, declared parameter set,
+A device-provided dynamic catalog and a generator based on the SigmaStudio `.params` export
+are post-MVP improvements. Adding either must preserve explicit contract versioning and keep
+DSP addresses off the BLE interface.
+
+Future bulk transfers use a session ID, transaction ID, contract ID, declared parameter set,
 offsets, total length, integrity value, credits, and fixed owned buffers. Disconnect,
 authorization loss, timeout, shutdown, or codec reset cancels the session with documented
 partial-application semantics.
@@ -173,9 +179,9 @@ stack, queue, controller-memory, and underrun measurements justify expansion.
 
 ## Delivery order
 
-1. Implemented: custom service, catalog, Status, correlated access, and parameter persistence.
-2. Next: transactional DSP apply and hardware validation.
-3. Optional bulk transfer, maintenance apply, and whole-profile persistence.
+1. Implemented: fixed contract, Status, indexed reads, scalar writes, and persistence.
+2. Next: hardware validation and DSP/flash power-loss reconciliation.
+3. Optional dynamic contract generation, bulk writes, and whole-profile persistence.
 4. BASS/Scan Delegator integration and simultaneous control/broadcast testing.
 5. Production roles, audit-safe records, stress tests, and recovery hardening.
 
