@@ -303,7 +303,7 @@ int adau1787_read_register(sub_addr_t reg_addr, reg_word_t* value)
   return adau1787_read(reg_addr, value, ADAU1787_CTRL_REG_WIDTH_BYTES);
 }
 
-// Conversions
+// TO-DO: replace with `sys_put_be16()`
 void split_addr(uint16_t word, uint8_t* byte)
 {
   byte[0] = (word >> 8) & 0xFF; // High byte

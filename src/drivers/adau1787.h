@@ -107,8 +107,8 @@ int adau1787_write_register(sub_addr_t reg_addr, reg_word_t* data);
  * @brief Perform a Safeload Write Operation to the ADAU1787 DSP.
  *
  * This function performs a safeload write to the ADAU1787's parameter RAM.
- * The safeload operation consists of writing up to five 4-byte words (32-bit
- * words) into predefined safeload data registers, setting the target
+ * The safeload operation consists of writing up to five 4-byte SigmaDSP
+ * parameter words into predefined safeload data registers, setting the target
  * address in the parameter RAM, and indicating the number of words to be
  * updated. Once the safeload write is triggered, the DSP core safely
  * transfers the data during the next available audio frame.
@@ -116,7 +116,7 @@ int adau1787_write_register(sub_addr_t reg_addr, reg_word_t* data);
  * @param target_addr SigmaStudio-generated address of the first parameter word
  *                    to update. This address is written to the safeload target
  *                    field without conversion.
- * @param data Pointer to the buffer containing big-endian 32-bit SigmaDSP
+ * @param data Pointer to the buffer containing big-endian four-byte SigmaDSP
  *             parameter words.
  * @param num_words Number of 32-bit words to be written (maximum 5).
  * @return 0 on success, or a negative error code on failure.
