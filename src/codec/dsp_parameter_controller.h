@@ -8,11 +8,11 @@
  * @file
  * @brief Runtime lifecycle controller for the fixed DSP parameter contract.
  *
- * The controller coordinates catalog validation, codec access, persistent
- * snapshots, cached scalar values, and the monotonically increasing parameter
- * revision. It decides when parameters are loaded, read, written, committed, or
- * rolled back; storage mechanics remain private to dsp_parameter_settings and
- * codec I/O remains private to codec_adapter.
+ * The controller coordinates codec access, persistent snapshots, cached scalar
+ * values, and the monotonically increasing parameter revision. It decides when
+ * parameters are loaded, read, written, committed, or rolled back; storage
+ * mechanics remain private to dsp_parameter_settings and codec I/O remains
+ * private to codec_adapter.
  *
  * Calls that access or mutate parameter state are serialized internally. The
  * module must be initialized before serving parameter requests.
@@ -27,16 +27,15 @@
 /**
  * @brief Initialize the runtime parameter state.
  *
- * The controller first installs catalog defaults and then asks the settings
- * adapter for a persistent snapshot. A missing, incompatible, or malformed
- * snapshot is treated as an empty first boot and leaves the defaults active.
- * Other settings backend failures abort initialization. Repeated successful
- * calls are harmless.
+ * The controller starts with zero-initialized cached values and then asks the
+ * settings adapter for a persistent snapshot. A missing, incompatible, or
+ * malformed snapshot leaves that initial state active. Other settings backend
+ * failures abort initialization. Repeated successful calls are harmless.
  *
  * Initialization restores the controller's cached scalar state and revision;
  * it does not proactively write the complete snapshot to the codec.
  *
- * @retval 0 The controller is ready, using either stored values or defaults.
+ * @retval 0 The controller is ready, using stored or zero-initialized values.
  * @return A negative errno-style settings error when initialization fails.
  */
 int dsp_parameter_controller_init(void);
@@ -65,15 +64,19 @@ int dsp_parameter_controller_init(void);
 int dsp_parameter_controller_get(uint8_t id, uint8_t word_index, int32_t* value, uint32_t* revision);
 
 /**
- * @brief Validate, apply, and persist a new scalar parameter value.
+ * @brief Apply and persist a new scalar parameter value.
  *
  * A successful operation is transactional from the controller's perspective:
- * it validates the request, writes the codec when codec access is available,
- * stores the complete pending snapshot, then advances the cached state and
- * revision. If persistence fails after a codec write, the controller attempts
- * to restore the previous codec value. When codec access reports -ENOTSUP, the
- * persistent state is still committed so the lifecycle can be exercised before
- * hardware parameter operations are implemented.
+ * it writes the codec when codec access is available, stores the complete
+ * pending snapshot, then advances the cached state and revision. If persistence
+ * fails after a codec write, the controller attempts to restore the previous
+ * codec value. When codec access reports -ENOTSUP, the persistent state is still
+ * committed so the lifecycle can be exercised before hardware parameter
+ * operations are implemented.
+ *
+ * The PoC trusts the workstation to provide correctly encoded values and does
+ * not perform firmware-side range, step, or prescription validation. Only
+ * structural ID and word bounds required for safe array and DSP access remain.
  *
  * @param[in] id Stable parameter ID from the fixed contract.
  * @param[in] word_index Zero-based word offset within the parameter.
@@ -82,9 +85,9 @@ int dsp_parameter_controller_get(uint8_t id, uint8_t word_index, int32_t* value,
  *
  * @retval 0 The value was persisted and the runtime state was committed.
  * @retval -ENOENT @p id is not part of the catalog.
- * @retval -EINVAL @p revision is NULL or the parameter is not persistent.
- * @retval -EACCES The selected parameter is read-only or not scalar-writable.
- * @retval -ERANGE The word index, value, or step alignment is invalid.
+ * @retval -EINVAL @p revision is NULL.
+ * @retval -EACCES The parameter is not one of the persisted PoC scalars.
+ * @retval -ERANGE The word index is outside the parameter.
  * @retval -EREMOTE Codec access failed.
  * @return Another negative errno-style value when persistence fails.
  */
@@ -104,7 +107,7 @@ uint32_t dsp_parameter_controller_revision(void);
 /**
  * @brief Report whether parameter initialization completed successfully.
  *
- * @retval true Defaults or a valid stored snapshot have been loaded.
+ * @retval true Initial state or a valid stored snapshot has been loaded.
  * @retval false Initialization has not completed successfully.
  */
 bool dsp_parameter_controller_loaded(void);

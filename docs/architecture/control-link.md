@@ -101,8 +101,8 @@ through `word_count - 1` to assemble a multiword value. Each word receives its o
 ID and correlated indication; revision must remain stable across the assembled read.
 
 Normal requests use stable IDs. Control Link validates framing, readiness, size, and queue
-capacity. The DSP parameter controller independently resolves the entry and validates access,
-range, and step before persistence.
+capacity. At the PoC stage, the firmware trusts the workstation's precomputed values and the
+DSP parameter controller performs only the structural bounds checks required for safe access.
 
 MVP constraints:
 
@@ -113,9 +113,9 @@ MVP constraints:
   record before RAM state and revision advance;
 - the parameter controller decides when values are loaded and saved, while the DSP parameter
   settings adapter exclusively owns the Zephyr Settings handler and persistent record format;
-- an empty or invalid first-boot record selects contract defaults, and readiness is independent
-  of Bluetooth startup order;
-- values outside their fixed range or off-step are rejected;
+- an empty or invalid first-boot record leaves the scalar cache zero-initialized, and readiness
+  is independent of Bluetooth startup order;
+- parameter value constraints are workstation-owned during the trusted PoC;
 - no raw RAM/register access, batch atomicity, or whole-profile replacement.
 
 Codec parameter I/O goes through Codec Adapter, the common boundary directly above the
@@ -171,9 +171,9 @@ initialize or route it. Add BASS solicitation, callback routing, and receive-sta
 without vendor source-selection opcodes.
 
 The MVP trusts one workstation and does not require encryption, bonding, or physical presence.
-It still validates IDs, encodings, bounds, sizes, queue capacity, and transaction IDs on-device.
-Production authorization, roles, audit records, and raw-memory maintenance access remain
-future work.
+It still validates structural framing, array bounds, sizes, queue capacity, and transaction IDs
+on-device, but trusts parameter values supplied by the workstation. Production authorization,
+semantic validation, roles, audit records, and raw-memory maintenance access remain future work.
 
 Audio deadlines take priority over management throughput. Keep buffers fixed, queues
 bounded, notifications rate-limited, and concurrency at one parameter operation until

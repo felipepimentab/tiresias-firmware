@@ -14,8 +14,8 @@
  * verifies record framing, contract compatibility, and CRC integrity.
  *
  * The adapter deliberately has no parameter lifecycle policy. It does not
- * choose defaults, validate individual values against the catalog, access the
- * codec, increment revisions, or decide when a load or save should occur. Those
+ * choose initial values, interpret individual values, access the codec,
+ * increment revisions, or decide when a load or save should occur. Those
  * responsibilities belong to dsp_parameter_controller.
  */
 
@@ -46,8 +46,8 @@ struct dsp_parameter_settings_snapshot {
  *
  * The settings handler is registered lazily on the first call. A successful
  * load verifies the record magic, storage version, encoded size, fixed DSP
- * contract CRC, value count, reserved fields, and record CRC before copying data to
- * @p snapshot. Semantic validation of individual values is left to the caller.
+ * contract CRC, value count, reserved fields, and record CRC before copying
+ * data to @p snapshot. Parameter values are treated as opaque signed words.
  *
  * This operation is intended for controller initialization and is not
  * reentrant. The output snapshot is modified only on success.

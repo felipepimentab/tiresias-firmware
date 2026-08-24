@@ -11,7 +11,7 @@
  * The catalog is the authoritative description of the DSP parameters exposed
  * by the MVP BLE contract. It assigns stable block and parameter IDs, describes
  * the public shape and capabilities of each parameter, and binds those public
- * definitions to private SigmaStudio DSP addresses and scalar constraints.
+ * definitions to private SigmaStudio DSP addresses.
  *
  * Contract membership implies read access. Parameters are read-only Q5.23
  * values unless their flags explicitly indicate write access or integer
@@ -93,8 +93,8 @@ enum dsp_block_id {
  * @brief Stable identifiers for parameters exposed over BLE.
  *
  * IDs are the only parameter identity carried by parameter read and write
- * requests. The firmware resolves an ID to a private DSP address through
- * @ref dsp_parameter_find, while the workstation resolves it to a display name.
+ * requests. The firmware uses an ID to index @ref dsp_parameter_addresses,
+ * while the workstation resolves it to a display name.
  */
 enum dsp_parameter_id {
   /** ADC selection scalar. */
@@ -134,7 +134,7 @@ enum dsp_parameter_id {
  *
  * This four-byte representation is shared with the workstation contract and is
  * used to calculate the fixed contract fingerprint. It deliberately excludes
- * names, constraints, defaults, and DSP addresses.
+ * names, prescription constraints, and DSP addresses.
  */
 struct dsp_parameter {
   /** Stable @ref dsp_parameter_id value. */
@@ -151,34 +151,10 @@ struct dsp_parameter {
 };
 
 /**
- * @brief Firmware-only binding and scalar constraints for one parameter.
- *
- * The descriptor augments the public contract entry with implementation data
- * that must never be exposed as raw codec access over BLE. Range, default, and
- * step fields use the representation selected by the public definition flags.
- */
-struct dsp_parameter_descriptor {
-  /** Public contract definition associated with this binding. */
-  const struct dsp_parameter* definition;
-
-  /** Private byte address of the parameter's first word in DSP memory. */
-  uint16_t dsp_address;
-
-  /** Inclusive minimum accepted for a writable scalar. */
-  int32_t minimum;
-
-  /** Inclusive maximum accepted for a writable scalar. */
-  int32_t maximum;
-
-  /** Value used when no valid persistent scalar snapshot is available. */
-  int32_t default_value;
-
-  /** Required increment from @ref minimum for a writable scalar. */
-  int32_t step;
-};
-
-/**
  * @brief Ordered public parameter contract.
+ *
+ * Entries are ordered by ID, so a validated nonzero ID maps to array index
+ * `id - 1`.
  *
  * The entry order and contents participate in
  * @ref DSP_PARAMETER_CONTRACT_CRC32. Any contract change must be mirrored in
@@ -188,31 +164,12 @@ struct dsp_parameter_descriptor {
 extern const struct dsp_parameter dsp_parameter_contract[DSP_PARAMETER_COUNT];
 
 /**
- * @brief Resolve a public parameter ID to its firmware-only descriptor.
+ * @brief Firmware-only DSP addresses indexed directly by parameter ID.
  *
- * @param[in] id Stable parameter ID from @ref dsp_parameter_id.
- *
- * @return Pointer to immutable catalog storage when the ID exists.
- * @retval NULL The ID is not part of the fixed contract.
+ * Index zero is unused because public parameter IDs start at one. Each other
+ * entry is the private byte address of that parameter's first DSP word. DSP
+ * addresses are never transmitted over BLE.
  */
-const struct dsp_parameter_descriptor* dsp_parameter_find(uint8_t id);
-
-/**
- * @brief Validate a requested write against the fixed parameter contract.
- *
- * Validation covers catalog membership, word bounds, write permission, scalar
- * shape, inclusive range, and step alignment. The current MVP permits writes
- * only to single-word parameters at word index zero.
- *
- * @param[in] parameter Descriptor returned by @ref dsp_parameter_find, or NULL.
- * @param[in] word_index Zero-based word offset within the parameter.
- * @param[in] value Integer or signed Q5.23 value, as selected by the flags.
- *
- * @retval 0 The requested value is valid and writable.
- * @retval -ENOENT @p parameter is NULL.
- * @retval -EACCES The parameter or selected word is not writable.
- * @retval -ERANGE The word index, value, or step alignment is invalid.
- */
-int dsp_parameter_validate(const struct dsp_parameter_descriptor* parameter, uint8_t word_index, int32_t value);
+extern const uint16_t dsp_parameter_addresses[DSP_PARAMETER_COUNT + 1U];
 
 #endif /* DSP_PARAMETER_CATALOG_H */
