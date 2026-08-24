@@ -111,8 +111,10 @@ MVP constraints:
 - only the six fixed scalar controls are writable and persisted;
 - every successful SET is committed as one versioned, contract-bound, CRC-checked settings
   record before RAM state and revision advance;
-- the parameter controller loads its own settings subtree during initialization, so an empty
-  first boot loads contract defaults and readiness is independent of Bluetooth startup order;
+- the parameter controller decides when values are loaded and saved, while the DSP parameter
+  settings adapter exclusively owns the Zephyr Settings handler and persistent record format;
+- an empty or invalid first-boot record selects contract defaults, and readiness is independent
+  of Bluetooth startup order;
 - values outside their fixed range or off-step are rejected;
 - no raw RAM/register access, batch atomicity, or whole-profile replacement.
 

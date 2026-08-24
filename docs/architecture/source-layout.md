@@ -25,8 +25,10 @@ Device Controller
 - Codec Controller owns lifecycle, command validation, serialized access,
   presentation state, fallback policy, and error handling.
 - The DSP parameter catalog owns the fixed contract, private addresses, and value
-  constraints. The parameter controller owns encoding, settings serialization,
-  persistence, and revisions, and reaches hardware only through Codec Adapter.
+  constraints. The parameter controller owns the parameter lifecycle: loading
+  defaults and stored values, validation, codec synchronization, persistence
+  decisions, fallback behavior, and revisions. The DSP parameter settings adapter
+  only serializes and retrieves the versioned flash record through Zephyr Settings.
 
 Move Codec Controller and `hw_codec` out of `src/audio` and `src/modules` into a
 dedicated `src/codec_controller` directory, or `src/codec` if that name is
