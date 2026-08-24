@@ -28,6 +28,26 @@ LOG_MODULE_REGISTER(dsp_parameter_settings, CONFIG_LOG_DEFAULT_LEVEL);
 
 BUILD_ASSERT(STORE_SIZE == 48U, "Persistent DSP parameter record changed unexpectedly");
 
+/**
+ * Persistent record layout, with every multibyte field encoded little-endian:
+ *
+ * | Offset | Size | Field                                      |
+ * |-------:|-----:|--------------------------------------------|
+ * |      0 |    4 | Record magic                               |
+ * |      4 |    2 | Storage format version                     |
+ * |      6 |    2 | Total record size                          |
+ * |      8 |    4 | Fixed DSP parameter contract ID            |
+ * |     12 |    4 | Parameter revision                         |
+ * |     16 |    2 | Persistent value count                     |
+ * |     18 |    2 | Reserved; must be zero                     |
+ * |     20 |   24 | Six signed 32-bit parameter values         |
+ * |     44 |    4 | CRC-32 over every preceding record byte    |
+ *
+ * The storage format version is independent of the public BLE contract version.
+ * The contract ID prevents a structurally valid record from being loaded by a
+ * firmware image whose fixed parameter identity has changed.
+ */
+
 static struct dsp_parameter_settings_snapshot loaded_snapshot;
 static int load_result = -ENOENT;
 static bool settings_registered;
