@@ -17,7 +17,7 @@
 #define Q5_23_FOUR 0x02000000
 #define Q5_23_STEP_1_256 0x00008000
 
-const struct dsp_parameter dsp_parameter_contract[DSP_PARAMETER_CONTRACT_COUNT] = {
+const struct dsp_parameter dsp_parameter_contract[DSP_PARAMETER_COUNT] = {
   { DSP_PARAMETER_ID_ADC_SELECT, DSP_BLOCK_ID_ADC_SELECT, 1,
       DSP_PARAMETER_CONTRACT_FLAG_WRITABLE | DSP_PARAMETER_CONTRACT_FLAG_INTEGER },
   { DSP_PARAMETER_ID_SOURCE_SELECT, DSP_BLOCK_ID_SOURCE_SELECT, 1,
@@ -37,7 +37,7 @@ const struct dsp_parameter dsp_parameter_contract[DSP_PARAMETER_CONTRACT_COUNT] 
   { DSP_PARAMETER_ID_SOFT_CLIP_LUT, DSP_BLOCK_ID_SOFT_CLIP, 45, 0 },
 };
 
-static const struct dsp_parameter_descriptor parameters[DSP_PARAMETER_CONTRACT_COUNT] = {
+static const struct dsp_parameter_descriptor parameters[DSP_PARAMETER_COUNT] = {
   { &dsp_parameter_contract[0], MOD_ADCSELECT_MONOSWSLEW_ADDR, 0, 3, 0, 1 },
   { &dsp_parameter_contract[1], MOD_SOURCESELECT_STEREOSWSLEW_ADDR, 0, 1, 1, 1 },
   { &dsp_parameter_contract[2], MOD_COMPRESSOR_BANK_BAND1COMPRESSOR_ALG0_MONONOPOSTGAINSUB1TAB0_ADDR, INT32_MIN,
@@ -64,8 +64,7 @@ static const struct dsp_parameter_descriptor parameters[DSP_PARAMETER_CONTRACT_C
 };
 
 BUILD_ASSERT(sizeof(struct dsp_parameter) == 4U, "The fixed contract fingerprint requires four-byte entries");
-BUILD_ASSERT(
-    ARRAY_SIZE(parameters) == DSP_PARAMETER_CONTRACT_COUNT, "Parameter bindings must match the fixed contract");
+BUILD_ASSERT(ARRAY_SIZE(parameters) == DSP_PARAMETER_COUNT, "Parameter bindings must match the fixed contract");
 BUILD_ASSERT(MOD_COMPRESSOR_BANK_BAND1COMPRESSOR_ALG0_DATA_ADR_ADDR
             == MOD_COMPRESSOR_BANK_BAND1COMPRESSOR_ALG0_MONONOPOSTGAINSUB1TAB0_ADDR + 34U * sizeof(uint32_t)
         && MOD_COMPRESSOR_BANK_BAND2COMPRESSOR_ALG0_DATA_ADR_ADDR

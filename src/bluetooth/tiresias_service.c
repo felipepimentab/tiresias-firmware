@@ -78,12 +78,9 @@ static void encode_protocol_info(uint8_t data[TIRESIAS_PROTOCOL_INFO_SIZE])
   sys_put_le32(TIRESIAS_CAPABILITIES, &data[4]);
   sys_put_le16(TIRESIAS_REQUEST_SIZE, &data[8]);
   sys_put_le16(TIRESIAS_RESPONSE_SIZE, &data[10]);
-  sys_put_le16(DSP_PARAMETER_CONTRACT_VERSION, &data[12]);
-  sys_put_le16(DSP_PARAMETER_CONTRACT_COUNT, &data[14]);
-  sys_put_le32(DSP_PARAMETER_CONTRACT_ID, &data[16]);
-  sys_put_le32(DSP_PARAMETER_CONTRACT_CRC32, &data[20]);
-  sys_put_le32(boot_id, &data[24]);
-  sys_put_le32(dsp_parameter_controller_revision(), &data[28]);
+  sys_put_le32(DSP_PARAMETER_CONTRACT_CRC32, &data[12]);
+  sys_put_le32(boot_id, &data[16]);
+  sys_put_le32(dsp_parameter_controller_revision(), &data[20]);
 }
 
 static int encode_status(uint8_t data[TIRESIAS_STATUS_SIZE])

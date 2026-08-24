@@ -59,7 +59,7 @@ The service UUID is `7b9a0001-6e4f-4b2d-a9c8-4f2e6f5d1000`. Characteristic UUIDs
 
 | Characteristic | Properties | Content |
 |---|---|---|
-| Protocol Information (`0002`) | Read | Versions, capabilities, limits, contract identity, boot ID, revision |
+| Protocol Information (`0002`) | Read | Protocol version, capabilities, limits, contract CRC, boot ID, revision |
 | Status (`0004`) | Read, Notify | Control state, persistence state, and last operation |
 | Request (`0005`) | Write | One correlated indexed-word operation |
 | Response (`0006`) | Indicate | Correlated indexed-word result |
@@ -72,7 +72,7 @@ All integers are little-endian. Wire layouts are fixed and encoded field by fiel
 
 | Value | Size | Layout |
 |---|---:|---|
-| Protocol Information | 32 | `u8 major, u8 minor, u16 length, u32 capabilities, u16 max_request, u16 max_response, u16 contract_version, u16 parameter_count, u32 contract_id, u32 contract_crc, u32 boot_id, u32 revision` |
+| Protocol Information | 24 | `u8 major, u8 minor, u16 length, u32 capabilities, u16 max_request, u16 max_response, u32 contract_crc, u32 boot_id, u32 revision` |
 | Request | 12 | `u8 opcode, u8 flags, u32 transaction_id, u8 parameter_id, u8 word_index, i32 value` |
 | Response | 16 | `u8 opcode, u8 result, u32 transaction_id, u8 parameter_id, u8 word_index, i32 value, u32 revision` |
 | Status | 16 | `u8 state, u8 flags, u8 last_result, u8 reserved, u32 revision, u32 last_transaction_id, u8 last_parameter_id, u8 last_word_index, u16 reserved` |
@@ -80,8 +80,8 @@ All integers are little-endian. Wire layouts are fixed and encoded field by fiel
 Protocol constants and result values are public in `tiresias_service.h`. Transaction ID zero,
 nonzero flags, and nonzero GET values are invalid. CCC, readiness, malformed-length, and busy
 failures are rejected at ATT admission; every accepted request completes with one indication
-using the same nonzero transaction ID while the session remains connected. Protocol v2 uses
-contract ID `0x54525001`, contract version `1`, 15 parameters, and CRC32 `0xf62c1808`.
+using the same nonzero transaction ID while the session remains connected. Protocol v3 uses
+the single DSP contract fingerprint CRC32 `0xf62c1808`.
 
 ## Fixed DSP contract
 
@@ -126,10 +126,10 @@ deferred DSP access. A future adapter implementation must define write atomicity
 before the deferred flag is removed.
 
 A device-provided dynamic catalog and a generator based on the SigmaStudio `.params` export
-are post-MVP improvements. Adding either must preserve explicit contract versioning and keep
-DSP addresses off the BLE interface.
+are post-MVP improvements. Compatibility negotiation for a dynamic catalog can be designed if
+that direction is pursued; DSP addresses must remain off the BLE interface.
 
-Future bulk transfers use a session ID, transaction ID, contract ID, declared parameter set,
+Future bulk transfers use a session ID, transaction ID, contract fingerprint, declared parameter set,
 offsets, total length, integrity value, credits, and fixed owned buffers. Disconnect,
 authorization loss, timeout, shutdown, or codec reset cancels the session with documented
 partial-application semantics.

@@ -27,20 +27,11 @@
 
 #include <stdint.h>
 
-/** Opaque identifier for this fixed firmware/workstation contract. */
-#define DSP_PARAMETER_CONTRACT_ID 0x54525001U
-
-/** Version of the fixed contract schema. */
-#define DSP_PARAMETER_CONTRACT_VERSION 1U
-
 /** CRC-32 fingerprint of the ordered public parameter contract. */
 #define DSP_PARAMETER_CONTRACT_CRC32 0xF62C1808U
 
-/** Number of processing blocks represented by the fixed contract. */
-#define DSP_BLOCK_CONTRACT_COUNT 15U
-
-/** Number of parameters represented by the fixed contract. */
-#define DSP_PARAMETER_CONTRACT_COUNT 15U
+/** Number of entries in @ref dsp_parameter_contract. */
+#define DSP_PARAMETER_COUNT 15U
 
 /** Number of scalar parameter values retained in persistent storage. */
 #define DSP_PARAMETER_PERSISTENT_COUNT 6U
@@ -192,9 +183,9 @@ struct dsp_parameter_descriptor {
  * The entry order and contents participate in
  * @ref DSP_PARAMETER_CONTRACT_CRC32. Any contract change must be mirrored in
  * `tiresias_workstation.domain.dsp_contract` and reflected in the contract
- * compatibility fields.
+ * CRC.
  */
-extern const struct dsp_parameter dsp_parameter_contract[DSP_PARAMETER_CONTRACT_COUNT];
+extern const struct dsp_parameter dsp_parameter_contract[DSP_PARAMETER_COUNT];
 
 /**
  * @brief Resolve a public parameter ID to its firmware-only descriptor.
