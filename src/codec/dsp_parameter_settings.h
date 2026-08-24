@@ -46,7 +46,7 @@ struct dsp_parameter_settings_snapshot {
  *
  * The settings handler is registered lazily on the first call. A successful
  * load verifies the record magic, storage version, encoded size, fixed DSP
- * contract ID, value count, reserved fields, and CRC before copying data to
+ * contract CRC, value count, reserved fields, and record CRC before copying data to
  * @p snapshot. Semantic validation of individual values is left to the caller.
  *
  * This operation is intended for controller initialization and is not
