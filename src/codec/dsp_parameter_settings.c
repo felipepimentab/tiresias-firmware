@@ -16,8 +16,6 @@
 
 #define SETTINGS_SUBTREE "tiresias/parameters"
 #define SETTINGS_KEY_SIZE sizeof(SETTINGS_SUBTREE "/255")
-#define PARAMETER_BYTE_COUNT(word_count) ((word_count) * sizeof(uint32_t))
-
 LOG_MODULE_REGISTER(dsp_parameter_settings, CONFIG_LOG_DEFAULT_LEVEL);
 
 static uint8_t* const* load_targets;
@@ -70,7 +68,7 @@ static int parameter_settings_set(const char* name, size_t len, settings_read_cb
   }
 
   parameter = parameter_definition(id);
-  expected_size = PARAMETER_BYTE_COUNT(parameter->word_count);
+  expected_size = parameter->byte_count;
   if (load_targets[id] == NULL || len != expected_size) {
     LOG_WRN("Ignoring DSP parameter %u with length %zu; expected %zu", id, len, expected_size);
     return 0;
@@ -115,7 +113,7 @@ int dsp_parameter_settings_init(void)
   return 0;
 }
 
-int dsp_parameter_settings_load(uint8_t* const parameter_data[DSP_PARAMETER_COUNT + 1U])
+int dsp_parameter_settings_load(uint8_t* const parameter_data[DSP_PARAMETER_COUNT + 1U], bool save_missing_parameters)
 {
   int ret;
 
@@ -139,6 +137,9 @@ int dsp_parameter_settings_load(uint8_t* const parameter_data[DSP_PARAMETER_COUN
   if (load_result != 0) {
     return load_result;
   }
+  if (!save_missing_parameters) {
+    return 0;
+  }
 
   for (size_t parameter_index = 0U; parameter_index < DSP_PARAMETER_COUNT; parameter_index++) {
     const struct dsp_parameter* parameter = &dsp_parameter_contract[parameter_index];
@@ -147,8 +148,7 @@ int dsp_parameter_settings_load(uint8_t* const parameter_data[DSP_PARAMETER_COUN
       continue;
     }
 
-    ret = dsp_parameter_settings_save(
-        parameter->id, parameter_data[parameter->id], PARAMETER_BYTE_COUNT(parameter->word_count));
+    ret = dsp_parameter_settings_save(parameter->id, parameter_data[parameter->id], parameter->byte_count);
     if (ret != 0) {
       return ret;
     }
@@ -166,7 +166,7 @@ int dsp_parameter_settings_save(uint8_t id, const uint8_t* data, size_t size)
   if (parameter == NULL) {
     return -ENOENT;
   }
-  if (data == NULL || size != PARAMETER_BYTE_COUNT(parameter->word_count)) {
+  if (data == NULL || size != parameter->byte_count) {
     return -EINVAL;
   }
 

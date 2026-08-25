@@ -10,9 +10,6 @@
 #include <stddef.h>
 #include <stdint.h>
 
-/** Size in bytes of one ADAU1787 parameter-memory word. */
-#define CODEC_PARAMETER_WORD_SIZE 4U
-
 /**
  * @brief Read bytes from live codec parameter memory.
  *

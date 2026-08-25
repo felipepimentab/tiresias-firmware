@@ -16,29 +16,26 @@
 #include <zephyr/kernel.h>
 #include <zephyr/logging/log.h>
 #include <zephyr/sys/atomic.h>
-#include <zephyr/sys/byteorder.h>
 #include <zephyr/sys/util.h>
 
 LOG_MODULE_REGISTER(dsp_parameter_controller, CONFIG_LOG_DEFAULT_LEVEL);
 
-#define PARAMETER_BYTE_COUNT(word_count) ((word_count) * CODEC_PARAMETER_WORD_SIZE)
-
 static K_MUTEX_DEFINE(parameter_mutex);
-static uint8_t param_adc_select[PARAMETER_BYTE_COUNT(1U)];
-static uint8_t param_source_select[PARAMETER_BYTE_COUNT(1U)];
-static uint8_t param_band_1_compressor_lut[PARAMETER_BYTE_COUNT(34U)];
-static uint8_t param_band_2_compressor_lut[PARAMETER_BYTE_COUNT(34U)];
-static uint8_t param_band_3_compressor_lut[PARAMETER_BYTE_COUNT(34U)];
-static uint8_t param_band_4_compressor_lut[PARAMETER_BYTE_COUNT(34U)];
-static uint8_t param_band_5_compressor_lut[PARAMETER_BYTE_COUNT(34U)];
-static uint8_t param_band_6_compressor_lut[PARAMETER_BYTE_COUNT(34U)];
-static uint8_t param_band_7_compressor_lut[PARAMETER_BYTE_COUNT(34U)];
-static uint8_t param_band_8_compressor_lut[PARAMETER_BYTE_COUNT(34U)];
-static uint8_t param_phase_comp_gain_1[PARAMETER_BYTE_COUNT(1U)];
-static uint8_t param_phase_comp_gain_2[PARAMETER_BYTE_COUNT(1U)];
-static uint8_t param_phase_comp_gain_3[PARAMETER_BYTE_COUNT(1U)];
-static uint8_t param_output_headroom_gain[PARAMETER_BYTE_COUNT(1U)];
-static uint8_t param_soft_clip_lut[PARAMETER_BYTE_COUNT(45U)];
+static uint8_t param_adc_select[4U];
+static uint8_t param_source_select[4U];
+static uint8_t param_band_1_compressor_lut[136U];
+static uint8_t param_band_2_compressor_lut[136U];
+static uint8_t param_band_3_compressor_lut[136U];
+static uint8_t param_band_4_compressor_lut[136U];
+static uint8_t param_band_5_compressor_lut[136U];
+static uint8_t param_band_6_compressor_lut[136U];
+static uint8_t param_band_7_compressor_lut[136U];
+static uint8_t param_band_8_compressor_lut[136U];
+static uint8_t param_phase_comp_gain_1[4U];
+static uint8_t param_phase_comp_gain_2[4U];
+static uint8_t param_phase_comp_gain_3[4U];
+static uint8_t param_output_headroom_gain[4U];
+static uint8_t param_soft_clip_lut[DSP_PARAMETER_MAX_BYTE_COUNT];
 
 static uint8_t* const parameter_data[DSP_PARAMETER_COUNT + 1U] = {
   [DSP_PARAMETER_ID_ADC_SELECT] = param_adc_select,
@@ -84,59 +81,39 @@ static const struct dsp_parameter* parameter_definition(uint8_t id)
   return parameter->id == id ? parameter : NULL;
 }
 
-static size_t parameter_byte_count(const struct dsp_parameter* parameter)
+static uint8_t* parameter_bytes(const struct dsp_parameter* parameter, uint8_t byte_offset)
 {
-  return PARAMETER_BYTE_COUNT(parameter->word_count);
+  return &parameter_data[parameter->id][byte_offset];
 }
 
-static uint8_t* parameter_word(const struct dsp_parameter* parameter, uint8_t word_index)
+static bool parameter_range_valid(const struct dsp_parameter* parameter, uint8_t byte_offset, size_t size)
 {
-  return &parameter_data[parameter->id][PARAMETER_BYTE_COUNT(word_index)];
+  return size > 0U && byte_offset < parameter->byte_count && size <= parameter->byte_count - byte_offset;
 }
 
-static int32_t decode_parameter_word(
-    const struct dsp_parameter* parameter, const uint8_t word[CODEC_PARAMETER_WORD_SIZE])
+static int load_parameter_defaults(void)
 {
-  uint32_t raw = sys_get_be32(word);
-
-  if ((parameter->flags & DSP_PARAMETER_CONTRACT_FLAG_INTEGER) == 0U) {
-    raw &= 0x0FFFFFFFU;
-    if ((raw & BIT(27)) != 0U) {
-      raw |= 0xF0000000U;
-    }
-  }
-
-  return (int32_t)raw;
-}
-
-static void encode_parameter_word(
-    const struct dsp_parameter* parameter, int32_t value, uint8_t word[CODEC_PARAMETER_WORD_SIZE])
-{
-  uint32_t raw = (uint32_t)value;
-
-  if ((parameter->flags & DSP_PARAMETER_CONTRACT_FLAG_INTEGER) == 0U) {
-    raw &= 0x0FFFFFFFU;
-  }
-  sys_put_be32(raw, word);
-}
-
-static int load_sigma_defaults(void)
-{
-#if !defined(CONFIG_AUDIO_CODEC_ADAU1787)
-  return -ENOTSUP;
-#else
   size_t byte_count = 0U;
 
   for (size_t parameter_index = 0; parameter_index < DSP_PARAMETER_COUNT; parameter_index++) {
     const struct dsp_parameter* parameter = &dsp_parameter_contract[parameter_index];
+#if defined(CONFIG_AUDIO_CODEC_ADAU1787)
     const uint8_t* defaults = dsp_parameter_default(parameter->id);
-    size_t size = parameter_byte_count(parameter);
+#endif
+    size_t size = parameter->byte_count;
 
-    if (defaults == NULL || parameter_data[parameter->id] == NULL) {
+    if (parameter_data[parameter->id] == NULL) {
       return -EINVAL;
     }
 
+#if defined(CONFIG_AUDIO_CODEC_ADAU1787)
+    if (defaults == NULL) {
+      return -EINVAL;
+    }
     memcpy(parameter_data[parameter->id], defaults, size);
+#else
+    memset(parameter_data[parameter->id], 0, size);
+#endif
     byte_count += size;
   }
 
@@ -146,18 +123,25 @@ static int load_sigma_defaults(void)
 
   atomic_clear(&current_revision);
   return 0;
-#endif
 }
 
-static int write_codec_word(
-    const struct dsp_parameter* parameter, uint8_t word_index, const uint8_t word[CODEC_PARAMETER_WORD_SIZE])
+static int write_codec_bytes(
+    const struct dsp_parameter* parameter, uint8_t byte_offset, const uint8_t* data, size_t size)
 {
+#if defined(CONFIG_AUDIO_CODEC_ADAU1787)
   int ret;
 
-  ret = codec_param_write(
-      dsp_parameter_addresses[parameter->id] + PARAMETER_BYTE_COUNT(word_index), word, CODEC_PARAMETER_WORD_SIZE);
+  ret = codec_param_write(dsp_parameter_addresses[parameter->id] + byte_offset, data, size);
 
   return ret == 0 ? 0 : -EREMOTE;
+#else
+  ARG_UNUSED(parameter);
+  ARG_UNUSED(byte_offset);
+  ARG_UNUSED(data);
+  ARG_UNUSED(size);
+
+  return 0;
+#endif
 }
 
 static int write_all_codec_values(void)
@@ -167,35 +151,32 @@ static int write_all_codec_values(void)
   for (size_t parameter_index = 0; parameter_index < DSP_PARAMETER_COUNT; parameter_index++) {
     const struct dsp_parameter* parameter = &dsp_parameter_contract[parameter_index];
 
-    for (uint8_t word_index = 0U; word_index < parameter->word_count; word_index++) {
-      ret = write_codec_word(parameter, word_index, parameter_word(parameter, word_index));
-      if (ret != 0) {
-        LOG_ERR("Failed to restore DSP parameter %u word %u", parameter->id, word_index);
-        return ret;
-      }
+    ret = write_codec_bytes(parameter, 0U, parameter_data[parameter->id], parameter->byte_count);
+    if (ret != 0) {
+      LOG_ERR("Failed to restore DSP parameter %u", parameter->id);
+      return ret;
     }
   }
 
   return 0;
 }
 
-static int persist_word(const struct dsp_parameter* parameter, uint8_t word_index,
-    const uint8_t word[CODEC_PARAMETER_WORD_SIZE], uint32_t* revision)
+static int persist_bytes(
+    const struct dsp_parameter* parameter, uint8_t byte_offset, const uint8_t* data, size_t size, uint32_t* revision)
 {
   uint32_t pending_revision = (uint32_t)atomic_get(&current_revision) + 1U;
-  uint8_t previous_word[CODEC_PARAMETER_WORD_SIZE];
-  uint8_t* current_word = parameter_word(parameter, word_index);
+  uint8_t pending_parameter[DSP_PARAMETER_MAX_BYTE_COUNT];
   int ret;
 
-  memcpy(previous_word, current_word, sizeof(previous_word));
-  memcpy(current_word, word, CODEC_PARAMETER_WORD_SIZE);
+  memcpy(pending_parameter, parameter_data[parameter->id], parameter->byte_count);
+  memcpy(&pending_parameter[byte_offset], data, size);
 
-  ret = dsp_parameter_settings_save(parameter->id, parameter_data[parameter->id], parameter_byte_count(parameter));
+  ret = dsp_parameter_settings_save(parameter->id, pending_parameter, parameter->byte_count);
   if (ret != 0) {
-    memcpy(current_word, previous_word, sizeof(previous_word));
     return ret;
   }
 
+  memcpy(parameter_data[parameter->id], pending_parameter, parameter->byte_count);
   atomic_set(&current_revision, (atomic_val_t)pending_revision);
   *revision = pending_revision;
   return 0;
@@ -215,12 +196,12 @@ int dsp_parameter_controller_init(void)
     return 0;
   }
 
-  ret = load_sigma_defaults();
+  ret = load_parameter_defaults();
   if (ret != 0) {
     goto out;
   }
 
-  ret = dsp_parameter_settings_load(parameter_data);
+  ret = dsp_parameter_settings_load(parameter_data, IS_ENABLED(CONFIG_AUDIO_CODEC_ADAU1787));
   if (ret != 0) {
     goto out;
   }
@@ -237,17 +218,17 @@ out:
   return ret;
 }
 
-int dsp_parameter_controller_get(uint8_t id, uint8_t word_index, int32_t* value, uint32_t* revision)
+int dsp_parameter_controller_get(uint8_t id, uint8_t byte_offset, uint8_t* data, size_t size, uint32_t* revision)
 {
   const struct dsp_parameter* parameter = parameter_definition(id);
 
   if (parameter == NULL) {
     return -ENOENT;
   }
-  if (value == NULL || revision == NULL) {
+  if (data == NULL || revision == NULL) {
     return -EINVAL;
   }
-  if (word_index >= parameter->word_count) {
+  if (!parameter_range_valid(parameter, byte_offset, size)) {
     return -ERANGE;
   }
   if (atomic_get(&parameters_initialized) == 0) {
@@ -255,95 +236,93 @@ int dsp_parameter_controller_get(uint8_t id, uint8_t word_index, int32_t* value,
   }
 
   k_mutex_lock(&parameter_mutex, K_FOREVER);
-  *value = decode_parameter_word(parameter, parameter_word(parameter, word_index));
+  memcpy(data, parameter_bytes(parameter, byte_offset), size);
   *revision = (uint32_t)atomic_get(&current_revision);
   k_mutex_unlock(&parameter_mutex);
 
   return 0;
 }
 
-int dsp_parameter_controller_set(uint8_t id, uint8_t word_index, int32_t value, uint32_t* revision)
+int dsp_parameter_controller_set(uint8_t id, uint8_t byte_offset, const uint8_t* data, size_t size, uint32_t* revision)
 {
   const struct dsp_parameter* parameter = parameter_definition(id);
-  uint8_t previous_word[CODEC_PARAMETER_WORD_SIZE];
-  uint8_t pending_word[CODEC_PARAMETER_WORD_SIZE];
   int rollback_ret;
   int ret;
 
-  if (revision == NULL) {
+  if (data == NULL || revision == NULL) {
     return -EINVAL;
   }
   if (parameter == NULL) {
     return -ENOENT;
   }
-  if (word_index >= parameter->word_count) {
+  if ((parameter->flags & DSP_PARAMETER_CONTRACT_FLAG_WRITABLE) == 0U) {
+    return -EACCES;
+  }
+  if (!parameter_range_valid(parameter, byte_offset, size)) {
     return -ERANGE;
   }
   if (atomic_get(&parameters_initialized) == 0) {
     return -EAGAIN;
   }
 
-  encode_parameter_word(parameter, value, pending_word);
   k_mutex_lock(&parameter_mutex, K_FOREVER);
 
-  memcpy(previous_word, parameter_word(parameter, word_index), sizeof(previous_word));
-  if (memcmp(previous_word, pending_word, sizeof(previous_word)) == 0) {
+  if (memcmp(parameter_bytes(parameter, byte_offset), data, size) == 0) {
     *revision = (uint32_t)atomic_get(&current_revision);
     k_mutex_unlock(&parameter_mutex);
     return 0;
   }
 
-  ret = write_codec_word(parameter, word_index, pending_word);
+  ret = write_codec_bytes(parameter, byte_offset, data, size);
   if (ret != 0) {
-    LOG_ERR("Failed to write DSP parameter %u word %u", id, word_index);
+    LOG_ERR("Failed to write DSP parameter %u bytes %u..%zu", id, byte_offset, byte_offset + size - 1U);
     k_mutex_unlock(&parameter_mutex);
     return ret;
   }
 
-  ret = persist_word(parameter, word_index, pending_word, revision);
+  ret = persist_bytes(parameter, byte_offset, data, size, revision);
   if (ret != 0) {
-    rollback_ret = write_codec_word(parameter, word_index, previous_word);
+    rollback_ret = write_codec_bytes(parameter, byte_offset, parameter_bytes(parameter, byte_offset), size);
     if (rollback_ret != 0) {
-      LOG_ERR("Failed to roll back DSP parameter %u word %u", id, word_index);
+      LOG_ERR("Failed to roll back DSP parameter %u bytes %u..%zu", id, byte_offset, byte_offset + size - 1U);
     }
-    LOG_ERR("Failed to persist DSP parameter %u word %u: %d", id, word_index, ret);
+    LOG_ERR("Failed to persist DSP parameter %u bytes %u..%zu: %d", id, byte_offset, byte_offset + size - 1U, ret);
   }
 
   k_mutex_unlock(&parameter_mutex);
   return ret;
 }
 
-int dsp_parameter_controller_mirror_codec_update(uint8_t id, uint8_t word_index, int32_t value, uint32_t* revision)
+int dsp_parameter_controller_mirror_codec_update(
+    uint8_t id, uint8_t byte_offset, const uint8_t* data, size_t size, uint32_t* revision)
 {
   const struct dsp_parameter* parameter = parameter_definition(id);
-  uint8_t pending_word[CODEC_PARAMETER_WORD_SIZE];
   int ret;
 
-  if (revision == NULL) {
+  if (data == NULL || revision == NULL) {
     return -EINVAL;
   }
   if (parameter == NULL) {
     return -ENOENT;
   }
-  if (word_index >= parameter->word_count) {
+  if (!parameter_range_valid(parameter, byte_offset, size)) {
     return -ERANGE;
   }
   if (atomic_get(&parameters_initialized) == 0) {
     return -EAGAIN;
   }
 
-  encode_parameter_word(parameter, value, pending_word);
   k_mutex_lock(&parameter_mutex, K_FOREVER);
 
-  if (memcmp(parameter_word(parameter, word_index), pending_word, sizeof(pending_word)) == 0) {
+  if (memcmp(parameter_bytes(parameter, byte_offset), data, size) == 0) {
     *revision = (uint32_t)atomic_get(&current_revision);
     k_mutex_unlock(&parameter_mutex);
     return 0;
   }
 
-  ret = persist_word(parameter, word_index, pending_word, revision);
+  ret = persist_bytes(parameter, byte_offset, data, size, revision);
   if (ret != 0) {
-    LOG_ERR("Failed to mirror DSP parameter %u word %u: %d", id, word_index, ret);
+    LOG_ERR("Failed to mirror DSP parameter %u bytes %u..%zu: %d", id, byte_offset, byte_offset + size - 1U, ret);
   }
 
   k_mutex_unlock(&parameter_mutex);

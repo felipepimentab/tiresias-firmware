@@ -11,6 +11,7 @@
 #include "dsp_parameter_settings.h"
 
 #include <errno.h>
+#include <string.h>
 #include <zephyr/bluetooth/gatt.h>
 #include <zephyr/kernel.h>
 #include <zephyr/logging/log.h>
@@ -34,8 +35,8 @@ struct tiresias_request {
   uint8_t opcode;
   uint32_t transaction_id;
   uint8_t parameter_id;
-  uint8_t word_index;
-  int32_t value;
+  uint8_t byte_offset;
+  uint8_t data[TIRESIAS_PARAMETER_CHUNK_SIZE];
   uint32_t session_id;
 };
 
@@ -63,7 +64,7 @@ static uint32_t active_session_id;
 static atomic_t control_state;
 static atomic_t last_transaction_id;
 static atomic_t last_parameter_id;
-static atomic_t last_word_index;
+static atomic_t last_byte_offset;
 static atomic_t last_result;
 static atomic_t last_set_persisted;
 static uint32_t status_revision;
@@ -106,7 +107,7 @@ static int encode_status(uint8_t data[TIRESIAS_STATUS_SIZE])
   sys_put_le32(status_revision, &data[4]);
   sys_put_le32((uint32_t)atomic_get(&last_transaction_id), &data[8]);
   data[12] = (uint8_t)atomic_get(&last_parameter_id);
-  data[13] = (uint8_t)atomic_get(&last_word_index);
+  data[13] = (uint8_t)atomic_get(&last_byte_offset);
   sys_put_le16(0U, &data[14]);
   k_mutex_unlock(&service_mutex);
 
@@ -152,7 +153,8 @@ static ssize_t write_request(struct bt_conn* conn, const struct bt_gatt_attr* at
   }
 
   if (sys_get_le32(&data[2]) == 0U || data[6] == 0U
-      || (data[0] == TIRESIAS_OPCODE_GET_PARAMETER && sys_get_le32(&data[8]) != 0U)) {
+      || (data[0] == TIRESIAS_OPCODE_GET_PARAMETER
+          && (data[8] != 0U || data[9] != 0U || data[10] != 0U || data[11] != 0U))) {
     return BT_GATT_ERR(BT_ATT_ERR_VALUE_NOT_ALLOWED);
   }
 
@@ -177,8 +179,8 @@ static ssize_t write_request(struct bt_conn* conn, const struct bt_gatt_attr* at
   request.opcode = data[0];
   request.transaction_id = sys_get_le32(&data[2]);
   request.parameter_id = data[6];
-  request.word_index = data[7];
-  request.value = (int32_t)sys_get_le32(&data[8]);
+  request.byte_offset = data[7];
+  memcpy(request.data, &data[8], sizeof(request.data));
 
   if (k_msgq_put(&request_queue, &request, K_NO_WAIT) != 0) {
     atomic_set(&request_phase, REQUEST_PHASE_IDLE);
@@ -280,10 +282,12 @@ static void send_status_notification(struct bt_conn* conn)
 static void process_request(const struct tiresias_request* request)
 {
   struct bt_conn* conn;
-  int32_t value = request->value;
+  const struct dsp_parameter* parameter = NULL;
+  uint8_t data[TIRESIAS_PARAMETER_CHUNK_SIZE] = { 0 };
   uint32_t revision = dsp_parameter_controller_revision();
   bool setting = request->opcode == TIRESIAS_OPCODE_SET_PARAMETER;
   enum tiresias_result result;
+  size_t size = 1U;
   int ret;
 
   if (!session_is_active(request->session_id)) {
@@ -291,17 +295,24 @@ static void process_request(const struct tiresias_request* request)
     return;
   }
 
+  if (request->parameter_id > 0U && request->parameter_id <= DSP_PARAMETER_COUNT) {
+    parameter = &dsp_parameter_contract[request->parameter_id - 1U];
+    if (parameter->id == request->parameter_id && request->byte_offset < parameter->byte_count) {
+      size = MIN(sizeof(data), parameter->byte_count - request->byte_offset);
+    }
+  }
+
   if (setting) {
-    ret = dsp_parameter_controller_set(request->parameter_id, request->word_index, value, &revision);
+    ret = dsp_parameter_controller_set(request->parameter_id, request->byte_offset, request->data, size, &revision);
   } else {
-    ret = dsp_parameter_controller_get(request->parameter_id, request->word_index, &value, &revision);
+    ret = dsp_parameter_controller_get(request->parameter_id, request->byte_offset, data, size, &revision);
   }
   result = map_result(ret, setting);
 
   k_mutex_lock(&service_mutex, K_FOREVER);
   atomic_set(&last_transaction_id, (atomic_val_t)request->transaction_id);
   atomic_set(&last_parameter_id, request->parameter_id);
-  atomic_set(&last_word_index, request->word_index);
+  atomic_set(&last_byte_offset, request->byte_offset);
   atomic_set(&last_result, result);
   if (setting) {
     atomic_set(&last_set_persisted, result == TIRESIAS_RESULT_OK);
@@ -313,8 +324,11 @@ static void process_request(const struct tiresias_request* request)
   response_wire[1] = result;
   sys_put_le32(request->transaction_id, &response_wire[2]);
   response_wire[6] = request->parameter_id;
-  response_wire[7] = request->word_index;
-  sys_put_le32((uint32_t)value, &response_wire[8]);
+  response_wire[7] = request->byte_offset;
+  if (setting) {
+    memcpy(data, request->data, size);
+  }
+  memcpy(&response_wire[8], data, sizeof(data));
   sys_put_le32(revision, &response_wire[12]);
 
   conn = get_control_connection();

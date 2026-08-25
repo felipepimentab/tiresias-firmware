@@ -18,6 +18,7 @@
 
 #include "dsp_parameter_catalog.h"
 
+#include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
 
@@ -37,26 +38,28 @@ int dsp_parameter_settings_init(void);
  *
  * Each existing `tiresias/parameters/<id>` entry is copied directly to the
  * array indexed by that parameter ID. Missing or malformed entries leave their
- * destination arrays unchanged, allowing SigmaStudio defaults to remain in
- * RAM. Defaults for missing or malformed entries are then saved under their
- * own independent keys. This operation is intended for controller
- * initialization and is not reentrant.
+ * destination arrays unchanged. When @p save_missing_parameters is true, those
+ * unchanged defaults are saved under their own independent keys. This operation
+ * is intended for controller initialization and is not reentrant.
  *
  * @param[in,out] parameter_data Parameter arrays indexed by stable parameter ID.
+ * @param[in] save_missing_parameters Whether to create settings for parameters
+ * that were not loaded. Bluetooth-only builds pass false so their zero-filled
+ * placeholders cannot replace SigmaStudio defaults after a firmware change.
  *
  * @retval 0 All readable settings entries were loaded.
  * @retval -EINVAL @p parameter_data is NULL.
  * @retval -EIO A settings entry could not be read completely.
  * @return Another negative errno-style value from Zephyr Settings.
  */
-int dsp_parameter_settings_load(uint8_t* const parameter_data[DSP_PARAMETER_COUNT + 1U]);
+int dsp_parameter_settings_load(uint8_t* const parameter_data[DSP_PARAMETER_COUNT + 1U], bool save_missing_parameters);
 
 /**
  * @brief Save one complete RAM parameter to its independent flash key.
  *
  * @param[in] id Stable parameter ID.
  * @param[in] data Complete parameter bytes in DSP control-port order.
- * @param[in] size Size of @p data; must match the catalog word count.
+ * @param[in] size Size of @p data; must match the catalog byte count.
  *
  * @retval 0 The settings backend accepted the parameter.
  * @retval -ENOENT @p id is not part of the fixed catalog.

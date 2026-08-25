@@ -9,12 +9,13 @@
  * @brief Runtime lifecycle controller for the fixed DSP parameter contract.
  *
  * The controller keeps the fixed catalog's complete parameter image synchronized
- * across three locations: per-parameter byte arrays in RAM, the nRF5340's
- * internal flash, and the ADAU1787's parameter memory. RAM and flash retain
- * words byte-for-byte in ADAU1787 control-port order. The controller owns
- * lifecycle ordering and the boot-local, monotonically increasing parameter
- * revision; storage mechanics remain private to dsp_parameter_settings and
- * codec I/O remains private to codec_adapter.
+ * in per-parameter RAM arrays and the nRF5340's internal flash. Builds with
+ * CONFIG_AUDIO_CODEC_ADAU1787 also synchronize the ADAU1787's parameter memory;
+ * builds without it compile out all codec access. RAM and flash retain the
+ * opaque bytes unchanged. The controller owns lifecycle ordering and the
+ * boot-local, monotonically increasing parameter revision; storage mechanics
+ * remain private to dsp_parameter_settings and codec I/O remains private to
+ * codec_adapter.
  *
  * Calls that access or mutate parameter state are serialized internally. The
  * module must be initialized before serving parameter requests.
@@ -24,79 +25,84 @@
 #define DSP_PARAMETER_CONTROLLER_H
 
 #include <stdbool.h>
+#include <stddef.h>
 #include <stdint.h>
 
 /**
  * @brief Initialize the runtime parameter state.
  *
- * Call this after the codec driver has loaded the generated SigmaStudio image.
- * The controller first copies the catalog parameters' SigmaStudio defaults into
- * RAM, then loads each independently stored parameter directly into its matching
- * byte array. Missing settings leave that parameter at its default. The complete
- * resulting RAM state is written to the codec before initialization completes.
+ * In ADAU1787 builds, call this after the codec driver has loaded the generated
+ * SigmaStudio image. The controller copies the catalog parameters' SigmaStudio
+ * defaults into RAM. Builds without the codec use zero-filled opaque defaults.
+ * It then loads each independently stored parameter directly into its matching
+ * byte array. Missing settings leave that parameter at its applicable default.
+ * ADAU1787 builds write the complete resulting RAM state to the codec before
+ * initialization completes.
  *
  * A failed restore leaves the controller unavailable rather than exposing an
  * image that is known not to be synchronized. Repeated successful calls are
  * harmless.
  *
- * @retval 0 RAM, flash, and codec parameter memory are synchronized.
+ * @retval 0 RAM and flash are synchronized, as is codec parameter memory when enabled.
  * @return A negative errno-style value when defaults cannot be read, flash
  * cannot be loaded or initialized, or codec restoration fails.
  */
 int dsp_parameter_controller_init(void);
 
 /**
- * @brief Read one word of a catalog parameter.
+ * @brief Read an opaque byte range from a catalog parameter.
  *
- * The controller resolves @p id through the catalog, reads the raw word from
- * its synchronized parameter byte array, and converts it to the signed value
- * representation used by the Control Link API. Reads never perform codec or
- * flash I/O.
+ * The controller resolves @p id through the catalog and copies bytes from its
+ * synchronized parameter array without interpreting them. Reads never perform
+ * codec or flash I/O.
  *
  * @param[in] id Stable parameter ID from the fixed contract.
- * @param[in] word_index Zero-based word offset within the parameter.
- * @param[out] value Destination for the integer or signed Q5.23 word.
+ * @param[in] byte_offset Zero-based byte offset within the parameter.
+ * @param[out] data Destination for the opaque bytes.
+ * @param[in] size Number of bytes to copy.
  * @param[out] revision Destination for the current parameter revision. It is
  * written together with the value while the RAM mirror is locked.
  *
  * @retval 0 The value and revision were read from the RAM mirror.
  * @retval -ENOENT @p id is not part of the catalog.
- * @retval -EINVAL @p value or @p revision is NULL.
- * @retval -ERANGE @p word_index is outside the parameter.
+ * @retval -EINVAL @p data or @p revision is NULL.
+ * @retval -ERANGE The requested byte range is empty or outside the parameter.
  * @retval -EAGAIN Startup synchronization has not completed.
  */
-int dsp_parameter_controller_get(uint8_t id, uint8_t word_index, int32_t* value, uint32_t* revision);
+int dsp_parameter_controller_get(uint8_t id, uint8_t byte_offset, uint8_t* data, size_t size, uint32_t* revision);
 
 /**
- * @brief Apply a remotely supplied parameter value to all three mirrors.
+ * @brief Apply remotely supplied opaque bytes to every enabled mirror.
  *
- * This is the GATT/external-update path. The controller first writes the new
- * word to the codec, updates its owning RAM parameter, and saves that parameter's
- * byte array to its independent flash key. A codec failure leaves flash and RAM
- * unchanged. If persistence fails after the codec write, the controller restores
- * the RAM word and attempts to restore the codec's previous value.
+ * This is the GATT/external-update path. ADAU1787 builds first write the new
+ * byte range to the codec. The controller then saves the owning parameter's
+ * complete byte array to its independent flash key and updates RAM. A codec
+ * failure leaves flash and RAM unchanged. If persistence fails after a codec
+ * write, the controller attempts to restore the codec's previous bytes. Builds
+ * without the codec compile out both codec operations.
  *
- * The PoC trusts the workstation to provide correctly encoded values and does
- * not perform firmware-side range, step, or prescription validation. Only
- * structural ID and word bounds required for safe array and DSP access remain.
+ * The bytes have no numerical meaning to firmware. Only structural ID and byte
+ * bounds required for safe array and DSP access are validated.
  *
  * @param[in] id Stable parameter ID from the fixed contract.
- * @param[in] word_index Zero-based word offset within the parameter.
- * @param[in] value New integer or signed Q5.23 word.
+ * @param[in] byte_offset Zero-based byte offset within the parameter.
+ * @param[in] data New opaque bytes.
+ * @param[in] size Number of bytes to apply.
  * @param[out] revision Destination for the new revision on success.
  *
- * @retval 0 Codec, flash, and RAM contain the new value.
+ * @retval 0 Every enabled mirror contains the new bytes.
  * @retval -ENOENT @p id is not part of the catalog.
- * @retval -EINVAL @p revision is NULL.
- * @retval -ERANGE The word index is outside the parameter.
+ * @retval -EACCES The catalog does not permit writes to the parameter.
+ * @retval -EINVAL @p data or @p revision is NULL.
+ * @retval -ERANGE The requested byte range is empty or outside the parameter.
  * @retval -EAGAIN Startup synchronization has not completed.
  * @retval -EREMOTE Codec access failed.
  * @return Another negative errno-style value when persistence fails.
  */
-int dsp_parameter_controller_set(uint8_t id, uint8_t word_index, int32_t value, uint32_t* revision);
+int dsp_parameter_controller_set(uint8_t id, uint8_t byte_offset, const uint8_t* data, size_t size, uint32_t* revision);
 
 /**
- * @brief Mirror a parameter value already applied to the codec internally.
+ * @brief Mirror opaque parameter bytes already applied to the codec internally.
  *
  * Internal routines call this after successfully writing the codec. The codec
  * operation remains the caller's responsibility and is expected to use the
@@ -104,18 +110,20 @@ int dsp_parameter_controller_set(uint8_t id, uint8_t word_index, int32_t value, 
  * only that parameter. It does not write the codec.
  *
  * @param[in] id Stable parameter ID from the fixed contract.
- * @param[in] word_index Zero-based word offset within the parameter.
- * @param[in] value Value already present in codec parameter memory.
+ * @param[in] byte_offset Zero-based byte offset within the parameter.
+ * @param[in] data Opaque bytes already present in codec parameter memory.
+ * @param[in] size Number of bytes to mirror.
  * @param[out] revision Destination for the committed revision.
  *
  * @retval 0 Flash and RAM now mirror the codec value.
  * @retval -ENOENT @p id is not part of the catalog.
- * @retval -EINVAL @p revision is NULL.
- * @retval -ERANGE @p word_index is outside the parameter.
+ * @retval -EINVAL @p data or @p revision is NULL.
+ * @retval -ERANGE The requested byte range is empty or outside the parameter.
  * @retval -EAGAIN The controller has not completed startup synchronization.
  * @return Another negative errno-style value when persistence fails.
  */
-int dsp_parameter_controller_mirror_codec_update(uint8_t id, uint8_t word_index, int32_t value, uint32_t* revision);
+int dsp_parameter_controller_mirror_codec_update(
+    uint8_t id, uint8_t byte_offset, const uint8_t* data, size_t size, uint32_t* revision);
 
 /**
  * @brief Get the revision of the committed runtime parameter state.

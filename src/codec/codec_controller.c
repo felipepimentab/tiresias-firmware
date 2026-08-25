@@ -102,14 +102,16 @@ static int select_local_mode(void)
   int ret;
 
 #if defined(CONFIG_AUDIO_CODEC_ADAU1787)
+  uint8_t parameter_data[HW_CODEC_SOURCE_SELECT_SIZE];
   uint32_t revision;
 
-  ret = hw_codec_select_local();
+  ret = hw_codec_select_local(parameter_data);
   if (ret != 0) {
     return ret;
   }
 
-  ret = dsp_parameter_controller_mirror_codec_update(DSP_PARAMETER_ID_SOURCE_SELECT, 0U, 1, &revision);
+  ret = dsp_parameter_controller_mirror_codec_update(
+      DSP_PARAMETER_ID_SOURCE_SELECT, 0U, parameter_data, sizeof(parameter_data), &revision);
   if (ret != 0) {
     return ret;
   }
@@ -132,14 +134,16 @@ static int select_broadcast_mode(void)
   int ret;
 
 #if defined(CONFIG_AUDIO_CODEC_ADAU1787)
+  uint8_t parameter_data[HW_CODEC_SOURCE_SELECT_SIZE];
   uint32_t revision;
 
-  ret = hw_codec_select_i2s();
+  ret = hw_codec_select_i2s(parameter_data);
   if (ret != 0) {
     return ret;
   }
 
-  ret = dsp_parameter_controller_mirror_codec_update(DSP_PARAMETER_ID_SOURCE_SELECT, 0U, 0, &revision);
+  ret = dsp_parameter_controller_mirror_codec_update(
+      DSP_PARAMETER_ID_SOURCE_SELECT, 0U, parameter_data, sizeof(parameter_data), &revision);
   if (ret != 0) {
     return ret;
   }
@@ -194,16 +198,16 @@ static void handle_state_off(const struct zbus_channel* channel)
     enter_error();
     return;
   }
-
-  ret = dsp_parameter_controller_init();
-  if (ret != 0) {
-    LOG_ERR("Failed to synchronize DSP parameters: %d", ret);
-    enter_error();
-    return;
-  }
 #else
   LOG_INF("Hardware codec disabled for Bluetooth-only testing");
 #endif
+
+  ret = dsp_parameter_controller_init();
+  if (ret != 0) {
+    LOG_ERR("Failed to initialize DSP parameters: %d", ret);
+    enter_error();
+    return;
+  }
 
   ret = select_local_mode();
   if (ret != 0) {

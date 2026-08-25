@@ -13,10 +13,10 @@
  * the public shape and capabilities of each parameter, and binds those public
  * definitions to private SigmaStudio DSP addresses.
  *
- * Contract membership implies read access. Parameters are read-only Q5.23
- * values unless their flags explicitly indicate write access or integer
- * representation. Human-readable names are intentionally kept in the matching
- * workstation contract rather than transmitted by the firmware.
+ * Contract membership implies read access. Parameter contents are opaque byte
+ * arrays with no numerical representation or byte-order semantics in firmware.
+ * Human-readable names are intentionally kept in the matching workstation
+ * contract rather than transmitted by the firmware.
  *
  * This module contains immutable metadata only. It does not own runtime values,
  * persistence, BLE request handling, or codec access policy.
@@ -28,29 +28,26 @@
 #include <stdint.h>
 
 /** CRC-32 fingerprint of the ordered public parameter contract. */
-#define DSP_PARAMETER_CONTRACT_CRC32 0xF62C1808U
+#define DSP_PARAMETER_CONTRACT_CRC32 0x22045C5CU
 
 /** Number of entries in @ref dsp_parameter_contract. */
 #define DSP_PARAMETER_COUNT 15U
 
-/** Total number of 32-bit words across every parameter in the fixed contract. */
-#define DSP_PARAMETER_WORD_COUNT (2U + 8U * 34U + 4U + 45U)
-
 /** Total number of raw bytes across every parameter in the fixed contract. */
-#define DSP_PARAMETER_BYTE_COUNT (DSP_PARAMETER_WORD_COUNT * 4U)
+#define DSP_PARAMETER_BYTE_COUNT (2U * 4U + 8U * 136U + 4U * 4U + 180U)
+
+/** Largest opaque byte array in the fixed contract. */
+#define DSP_PARAMETER_MAX_BYTE_COUNT 180U
 
 /**
- * @brief Public parameter capability and representation flags.
+ * @brief Public parameter access flags.
  *
- * Flags occupy one byte in @ref dsp_parameter and may be combined. The absence
- * of @ref DSP_PARAMETER_CONTRACT_FLAG_INTEGER denotes a signed Q5.23 value.
+ * Flags occupy one byte in @ref dsp_parameter. They describe access only and
+ * never assign a representation to the opaque parameter bytes.
  */
 enum dsp_parameter_contract_flag {
   /** The parameter accepts write requests; all parameters remain readable. */
-  DSP_PARAMETER_CONTRACT_FLAG_WRITABLE = 1U << 0,
-
-  /** Parameter words are signed integers rather than signed Q5.23 values. */
-  DSP_PARAMETER_CONTRACT_FLAG_INTEGER = 1U << 1,
+  DSP_PARAMETER_CONTRACT_FLAG_WRITABLE = 1U << 0
 };
 
 /**
@@ -100,9 +97,9 @@ enum dsp_block_id {
  * while the workstation resolves it to a display name.
  */
 enum dsp_parameter_id {
-  /** ADC selection scalar. */
+  /** ADC selection parameter. */
   DSP_PARAMETER_ID_ADC_SELECT = 1,
-  /** Source selection scalar. */
+  /** Source selection parameter. */
   DSP_PARAMETER_ID_SOURCE_SELECT = 2,
   /** Band 1 compressor lookup table. */
   DSP_PARAMETER_ID_BAND_1_COMPRESSOR_LUT = 3,
@@ -120,13 +117,13 @@ enum dsp_parameter_id {
   DSP_PARAMETER_ID_BAND_7_COMPRESSOR_LUT = 9,
   /** Band 8 compressor lookup table. */
   DSP_PARAMETER_ID_BAND_8_COMPRESSOR_LUT = 10,
-  /** First phase-compensation gain scalar. */
+  /** First phase-compensation gain parameter. */
   DSP_PARAMETER_ID_PHASE_COMP_GAIN_1 = 11,
-  /** Second phase-compensation gain scalar. */
+  /** Second phase-compensation gain parameter. */
   DSP_PARAMETER_ID_PHASE_COMP_GAIN_2 = 12,
-  /** Third phase-compensation gain scalar. */
+  /** Third phase-compensation gain parameter. */
   DSP_PARAMETER_ID_PHASE_COMP_GAIN_3 = 13,
-  /** Output headroom gain scalar. */
+  /** Output headroom gain parameter. */
   DSP_PARAMETER_ID_OUTPUT_HEADROOM_GAIN = 14,
   /** Soft-clip lookup table. */
   DSP_PARAMETER_ID_SOFT_CLIP_LUT = 15,
@@ -146,8 +143,8 @@ struct dsp_parameter {
   /** Stable @ref dsp_block_id value for the owning processing block. */
   uint8_t block_id;
 
-  /** Number of consecutive 32-bit DSP words in the parameter. */
-  uint8_t word_count;
+  /** Number of consecutive opaque bytes in the parameter. */
+  uint8_t byte_count;
 
   /** Bitwise combination of @ref dsp_parameter_contract_flag values. */
   uint8_t flags;
@@ -170,7 +167,7 @@ extern const struct dsp_parameter dsp_parameter_contract[DSP_PARAMETER_COUNT];
  * @brief Firmware-only DSP addresses indexed directly by parameter ID.
  *
  * Index zero is unused because public parameter IDs start at one. Each other
- * entry is the private byte address of that parameter's first DSP word. DSP
+ * entry is the private byte address of that parameter's first byte. DSP
  * addresses are never transmitted over BLE.
  */
 extern const uint16_t dsp_parameter_addresses[DSP_PARAMETER_COUNT + 1U];

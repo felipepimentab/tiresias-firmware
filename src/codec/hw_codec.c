@@ -11,42 +11,28 @@
 
 #include <errno.h>
 #include <stdbool.h>
+#include <string.h>
 #include <zephyr/logging/log.h>
 LOG_MODULE_REGISTER(hw_codec, CONFIG_MODULE_HW_CODEC_LOG_LEVEL);
 
 #define ADC_SOURCE_SWITCH_ADDRESS MOD_ADCSELECT_MONOSWSLEW_ADDR
 #define LISTENING_MODE_SWITCH_ADDRESS MOD_SOURCESELECT_STEREOSWSLEW_ADDR
-#define LISTENING_MODE_I2S 0U
-#define LISTENING_MODE_LOCAL 1U
-
 BUILD_ASSERT(MOD_ADCSELECT_COUNT == 1, "ADC Select block must contain one parameter");
 BUILD_ASSERT(IS_PARAM_ADDR(ADC_SOURCE_SWITCH_ADDRESS), "ADC Select parameter must be in parameter RAM");
+BUILD_ASSERT(HW_CODEC_SOURCE_SELECT_SIZE == ADAU1787_PARAM_RAM_WIDTH_BYTES,
+    "Source Select byte array must match its generated parameter size");
 
-typedef enum source_adc {
-  ADC_0,
-  ADC_1,
-  ADC_2,
-  ADC_3,
-} source_adc;
+static uint8_t adc_0_parameter[] = { 0x00, 0x00, 0x00, 0x00 };
+static uint8_t listening_mode_i2s[] = { 0x00, 0x00, 0x00, 0x00 };
+static uint8_t listening_mode_local[] = { 0x00, 0x00, 0x00, 0x01 };
 
-static int set_source_adc(source_adc source)
+static int set_source_adc(uint8_t parameter_data[ADAU1787_PARAM_RAM_WIDTH_BYTES])
 {
-  param_word_t param = {
-    0U,
-    0U,
-    0U,
-    (uint8_t)source,
-  };
   int ret;
 
-  if ((uint32_t)source > (uint32_t)ADC_3) {
-    LOG_ERR("Invalid ADC source: %d", source);
-    return -EINVAL;
-  }
-
-  ret = adau1787_safeload_write(ADC_SOURCE_SWITCH_ADDRESS, param, MOD_ADCSELECT_COUNT);
+  ret = adau1787_safeload_write(ADC_SOURCE_SWITCH_ADDRESS, parameter_data, MOD_ADCSELECT_COUNT);
   if (ret != 0) {
-    LOG_ERR("Failed to select ADC source %d at 0x%04X: %d", source, ADC_SOURCE_SWITCH_ADDRESS, ret);
+    LOG_ERR("Failed to select ADC source at 0x%04X: %d", ADC_SOURCE_SWITCH_ADDRESS, ret);
   }
 
   return ret;
@@ -77,22 +63,23 @@ static int set_dac_mute(bool mute)
   return ret;
 }
 
-static int select_listening_mode(uint32_t mode)
+static int select_listening_mode(
+    uint8_t parameter_data[HW_CODEC_SOURCE_SELECT_SIZE], uint8_t mode[HW_CODEC_SOURCE_SELECT_SIZE])
 {
-  param_word_t codec_param = {
-    (mode >> 24) & 0xFF,
-    (mode >> 16) & 0xFF,
-    (mode >> 8) & 0xFF,
-    mode & 0xFF,
-  };
   int ret;
 
-  ret = adau1787_safeload_write(LISTENING_MODE_SWITCH_ADDRESS, codec_param, 1U);
-  if (ret != 0) {
-    LOG_ERR("Failed to select listening mode %u at 0x%04X: %d", mode, LISTENING_MODE_SWITCH_ADDRESS, ret);
+  if (parameter_data == NULL) {
+    return -EINVAL;
   }
 
-  return ret;
+  ret = adau1787_safeload_write(LISTENING_MODE_SWITCH_ADDRESS, mode, 1U);
+  if (ret != 0) {
+    LOG_ERR("Failed to select listening mode at 0x%04X: %d", LISTENING_MODE_SWITCH_ADDRESS, ret);
+    return ret;
+  }
+
+  memcpy(parameter_data, mode, HW_CODEC_SOURCE_SELECT_SIZE);
+  return 0;
 }
 
 int hw_codec_volume_set(uint8_t set_val)
@@ -148,17 +135,17 @@ int hw_codec_init(void)
     return ret;
   }
 
-  return set_source_adc(ADC_0);
+  return set_source_adc(adc_0_parameter);
 }
 
-int hw_codec_select_local(void)
+int hw_codec_select_local(uint8_t parameter_data[HW_CODEC_SOURCE_SELECT_SIZE])
 {
-  return select_listening_mode(LISTENING_MODE_LOCAL);
+  return select_listening_mode(parameter_data, listening_mode_local);
 }
 
-int hw_codec_select_i2s(void)
+int hw_codec_select_i2s(uint8_t parameter_data[HW_CODEC_SOURCE_SELECT_SIZE])
 {
-  return select_listening_mode(LISTENING_MODE_I2S);
+  return select_listening_mode(parameter_data, listening_mode_i2s);
 }
 
 void hw_codec_log_status_2(void)
