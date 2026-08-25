@@ -129,8 +129,6 @@ int hw_codec_init(void)
   if (ret != 0) {
     return ret;
   }
-
-  return set_source_adc(adc_0_parameter);
 }
 
 int hw_codec_select_local(void)
