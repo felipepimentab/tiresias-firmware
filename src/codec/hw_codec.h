@@ -9,8 +9,6 @@
 
 #include <stdint.h>
 
-#define HW_CODEC_SOURCE_SELECT_SIZE 4U
-
 /**
  * @brief  Set volume on HW_CODEC
  *
@@ -98,20 +96,16 @@ int hw_codec_init(void);
 /**
  * @brief Select the local microphone and DSP listening path.
  *
- * @param[out] parameter_data Opaque parameter bytes written to the codec.
- *
  * @return 0 if successful, error otherwise
  */
-int hw_codec_select_local(uint8_t parameter_data[HW_CODEC_SOURCE_SELECT_SIZE]);
+int hw_codec_select_local(void);
 
 /**
  * @brief Select the I2S listening path.
  *
- * @param[out] parameter_data Opaque parameter bytes written to the codec.
- *
  * @return 0 if successful, error otherwise
  */
-int hw_codec_select_i2s(uint8_t parameter_data[HW_CODEC_SOURCE_SELECT_SIZE]);
+int hw_codec_select_i2s(void);
 
 /**
  * @brief Read and log the HW codec STATUS2 register.

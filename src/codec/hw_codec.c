@@ -9,22 +9,18 @@
 #include "adau1787.h"
 #include "adau_1787_IC_1_SIGMA_PARAM.h"
 
-#include <errno.h>
 #include <stdbool.h>
-#include <string.h>
 #include <zephyr/logging/log.h>
 LOG_MODULE_REGISTER(hw_codec, CONFIG_MODULE_HW_CODEC_LOG_LEVEL);
 
 #define ADC_SOURCE_SWITCH_ADDRESS MOD_ADCSELECT_MONOSWSLEW_ADDR
 #define LISTENING_MODE_SWITCH_ADDRESS MOD_SOURCESELECT_STEREOSWSLEW_ADDR
+#define LISTENING_MODE_I2S 0U
+#define LISTENING_MODE_LOCAL 1U
 BUILD_ASSERT(MOD_ADCSELECT_COUNT == 1, "ADC Select block must contain one parameter");
 BUILD_ASSERT(IS_PARAM_ADDR(ADC_SOURCE_SWITCH_ADDRESS), "ADC Select parameter must be in parameter RAM");
-BUILD_ASSERT(HW_CODEC_SOURCE_SELECT_SIZE == ADAU1787_PARAM_RAM_WIDTH_BYTES,
-    "Source Select byte array must match its generated parameter size");
 
 static uint8_t adc_0_parameter[] = { 0x00, 0x00, 0x00, 0x00 };
-static uint8_t listening_mode_i2s[] = { 0x00, 0x00, 0x00, 0x00 };
-static uint8_t listening_mode_local[] = { 0x00, 0x00, 0x00, 0x01 };
 
 static int set_source_adc(uint8_t parameter_data[ADAU1787_PARAM_RAM_WIDTH_BYTES])
 {
@@ -63,23 +59,22 @@ static int set_dac_mute(bool mute)
   return ret;
 }
 
-static int select_listening_mode(
-    uint8_t parameter_data[HW_CODEC_SOURCE_SELECT_SIZE], uint8_t mode[HW_CODEC_SOURCE_SELECT_SIZE])
+static int select_listening_mode(uint32_t mode)
 {
+  param_word_t codec_param = {
+    (mode >> 24) & 0xFF,
+    (mode >> 16) & 0xFF,
+    (mode >> 8) & 0xFF,
+    mode & 0xFF,
+  };
   int ret;
 
-  if (parameter_data == NULL) {
-    return -EINVAL;
-  }
-
-  ret = adau1787_safeload_write(LISTENING_MODE_SWITCH_ADDRESS, mode, 1U);
+  ret = adau1787_safeload_write(LISTENING_MODE_SWITCH_ADDRESS, codec_param, 1U);
   if (ret != 0) {
-    LOG_ERR("Failed to select listening mode at 0x%04X: %d", LISTENING_MODE_SWITCH_ADDRESS, ret);
-    return ret;
+    LOG_ERR("Failed to select listening mode %u at 0x%04X: %d", mode, LISTENING_MODE_SWITCH_ADDRESS, ret);
   }
 
-  memcpy(parameter_data, mode, HW_CODEC_SOURCE_SELECT_SIZE);
-  return 0;
+  return ret;
 }
 
 int hw_codec_volume_set(uint8_t set_val)
@@ -138,14 +133,14 @@ int hw_codec_init(void)
   return set_source_adc(adc_0_parameter);
 }
 
-int hw_codec_select_local(uint8_t parameter_data[HW_CODEC_SOURCE_SELECT_SIZE])
+int hw_codec_select_local(void)
 {
-  return select_listening_mode(parameter_data, listening_mode_local);
+  return select_listening_mode(LISTENING_MODE_LOCAL);
 }
 
-int hw_codec_select_i2s(uint8_t parameter_data[HW_CODEC_SOURCE_SELECT_SIZE])
+int hw_codec_select_i2s(void)
 {
-  return select_listening_mode(parameter_data, listening_mode_i2s);
+  return select_listening_mode(LISTENING_MODE_I2S);
 }
 
 void hw_codec_log_status_2(void)

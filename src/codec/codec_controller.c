@@ -45,6 +45,11 @@ ZBUS_CHAN_ADD_OBS(audio_streaming_state_chan, codec_controller_sub, CODEC_CONTRO
 
 static codec_controller_state current_state = CODEC_CONTROLLER_STATE_OFF;
 
+#if defined(CONFIG_AUDIO_CODEC_ADAU1787)
+static const uint8_t source_select_i2s_data[] = { 0x00, 0x00, 0x00, 0x00 };
+static const uint8_t source_select_local_data[] = { 0x00, 0x00, 0x00, 0x01 };
+#endif
+
 static int set_state(codec_controller_state state)
 {
   codec_controller_state_chan_msg msg = {
@@ -102,16 +107,15 @@ static int select_local_mode(void)
   int ret;
 
 #if defined(CONFIG_AUDIO_CODEC_ADAU1787)
-  uint8_t parameter_data[HW_CODEC_SOURCE_SELECT_SIZE];
   uint32_t revision;
 
-  ret = hw_codec_select_local(parameter_data);
+  ret = hw_codec_select_local();
   if (ret != 0) {
     return ret;
   }
 
   ret = dsp_parameter_controller_mirror_codec_update(
-      DSP_PARAMETER_ID_SOURCE_SELECT, 0U, parameter_data, sizeof(parameter_data), &revision);
+      DSP_PARAMETER_ID_SOURCE_SELECT, 0U, source_select_local_data, sizeof(source_select_local_data), &revision);
   if (ret != 0) {
     return ret;
   }
@@ -134,16 +138,15 @@ static int select_broadcast_mode(void)
   int ret;
 
 #if defined(CONFIG_AUDIO_CODEC_ADAU1787)
-  uint8_t parameter_data[HW_CODEC_SOURCE_SELECT_SIZE];
   uint32_t revision;
 
-  ret = hw_codec_select_i2s(parameter_data);
+  ret = hw_codec_select_i2s();
   if (ret != 0) {
     return ret;
   }
 
   ret = dsp_parameter_controller_mirror_codec_update(
-      DSP_PARAMETER_ID_SOURCE_SELECT, 0U, parameter_data, sizeof(parameter_data), &revision);
+      DSP_PARAMETER_ID_SOURCE_SELECT, 0U, source_select_i2s_data, sizeof(source_select_i2s_data), &revision);
   if (ret != 0) {
     return ret;
   }
