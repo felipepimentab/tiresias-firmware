@@ -8,112 +8,88 @@
 
 #include <errno.h>
 #include <stdbool.h>
-#include <string.h>
+#include <stdio.h>
+#include <stdlib.h>
 #include <zephyr/logging/log.h>
 #include <zephyr/settings/settings.h>
-#include <zephyr/sys/byteorder.h>
-#include <zephyr/sys/crc.h>
 #include <zephyr/sys/util.h>
 
-#define SETTINGS_SUBTREE "tiresias"
-#define SETTINGS_NAME "parameters"
-#define SETTINGS_KEY SETTINGS_SUBTREE "/" SETTINGS_NAME
-#define STORE_MAGIC 0x54525053U
-#define STORE_VERSION 3U
-#define STORE_HEADER_SIZE 20U
-#define STORE_CRC_SIZE 4U
-#define STORE_SIZE (STORE_HEADER_SIZE + DSP_PARAMETER_WORD_COUNT * sizeof(int32_t) + STORE_CRC_SIZE)
+#define SETTINGS_SUBTREE "tiresias/parameters"
+#define SETTINGS_KEY_SIZE sizeof(SETTINGS_SUBTREE "/255")
+#define PARAMETER_BYTE_COUNT(word_count) ((word_count) * sizeof(uint32_t))
 
 LOG_MODULE_REGISTER(dsp_parameter_settings, CONFIG_LOG_DEFAULT_LEVEL);
 
-BUILD_ASSERT(STORE_SIZE == 1316U, "Persistent DSP parameter record changed unexpectedly");
-
-/**
- * Persistent record layout, with every multibyte field encoded little-endian:
- *
- * | Offset | Size | Field                                      |
- * |-------:|-----:|--------------------------------------------|
- * |      0 |    4 | Record magic                               |
- * |      4 |    2 | Storage format version                     |
- * |      6 |    2 | Total record size                          |
- * |      8 |    4 | DSP parameter contract CRC-32              |
- * |     12 |    4 | Parameter revision                         |
- * |     16 |    2 | Parameter word count                       |
- * |     18 |    2 | Reserved; must be zero                     |
- * |     20 | 1292 | 323 signed 32-bit parameter words          |
- * |   1312 |    4 | CRC-32 over every preceding record byte    |
- *
- * The contract CRC prevents a structurally valid record from being loaded by a
- * firmware image whose fixed parameter catalog has changed.
- */
-
-static struct dsp_parameter_settings_snapshot loaded_snapshot;
-static uint8_t store_blob[STORE_SIZE];
-static int load_result = -ENOENT;
+static uint8_t* const* load_targets;
+static uint32_t loaded_parameter_mask;
+static int load_result;
 static bool settings_registered;
 
-static void encode_store(uint8_t blob[STORE_SIZE], const struct dsp_parameter_settings_snapshot* snapshot)
-{
-  sys_put_le32(STORE_MAGIC, &blob[0]);
-  sys_put_le16(STORE_VERSION, &blob[4]);
-  sys_put_le16(STORE_SIZE, &blob[6]);
-  sys_put_le32(DSP_PARAMETER_CONTRACT_CRC32, &blob[8]);
-  sys_put_le32(snapshot->revision, &blob[12]);
-  sys_put_le16(DSP_PARAMETER_WORD_COUNT, &blob[16]);
-  sys_put_le16(0U, &blob[18]);
+BUILD_ASSERT(DSP_PARAMETER_COUNT <= 32U, "Loaded parameter mask must contain every parameter ID");
 
-  for (size_t index = 0; index < DSP_PARAMETER_WORD_COUNT; index++) {
-    sys_put_le32((uint32_t)snapshot->values[index], &blob[STORE_HEADER_SIZE + index * sizeof(int32_t)]);
+static const struct dsp_parameter* parameter_definition(uint8_t id)
+{
+  const struct dsp_parameter* parameter;
+
+  if (id == 0U || id > DSP_PARAMETER_COUNT) {
+    return NULL;
   }
 
-  sys_put_le32(crc32_ieee(blob, STORE_SIZE - STORE_CRC_SIZE), &blob[STORE_SIZE - STORE_CRC_SIZE]);
+  parameter = &dsp_parameter_contract[id - 1U];
+  return parameter->id == id ? parameter : NULL;
 }
 
-static int decode_store(const uint8_t blob[STORE_SIZE], struct dsp_parameter_settings_snapshot* snapshot)
+static int parameter_id_from_name(const char* name, uint8_t* id)
 {
-  uint32_t expected_crc = sys_get_le32(&blob[STORE_SIZE - STORE_CRC_SIZE]);
+  char* end;
+  unsigned long parsed_id;
 
-  if (sys_get_le32(&blob[0]) != STORE_MAGIC || sys_get_le16(&blob[4]) != STORE_VERSION
-      || sys_get_le16(&blob[6]) != STORE_SIZE || sys_get_le32(&blob[8]) != DSP_PARAMETER_CONTRACT_CRC32
-      || sys_get_le16(&blob[16]) != DSP_PARAMETER_WORD_COUNT || sys_get_le16(&blob[18]) != 0U
-      || crc32_ieee(blob, STORE_SIZE - STORE_CRC_SIZE) != expected_crc) {
-    return -EINVAL;
+  if (name == NULL || name[0] == '\0') {
+    return -ENOENT;
   }
 
-  snapshot->revision = sys_get_le32(&blob[12]);
-  for (size_t index = 0; index < DSP_PARAMETER_WORD_COUNT; index++) {
-    snapshot->values[index] = (int32_t)sys_get_le32(&blob[STORE_HEADER_SIZE + index * sizeof(int32_t)]);
+  errno = 0;
+  parsed_id = strtoul(name, &end, 10);
+  if (errno != 0 || end == name || *end != '\0' || parsed_id == 0U || parsed_id > DSP_PARAMETER_COUNT) {
+    return -ENOENT;
   }
 
-  return 0;
+  *id = (uint8_t)parsed_id;
+  return parameter_definition(*id) == NULL ? -ENOENT : 0;
 }
 
 static int parameter_settings_set(const char* name, size_t len, settings_read_cb read_cb, void* cb_arg)
 {
+  const struct dsp_parameter* parameter;
   ssize_t bytes_read;
+  size_t expected_size;
+  uint8_t id;
 
-  if (strcmp(name, SETTINGS_NAME) != 0) {
-    return -ENOENT;
-  }
-  if (len != sizeof(store_blob)) {
-    LOG_WRN("Ignoring persistent DSP record with length %zu", len);
-    load_result = -EINVAL;
+  if (parameter_id_from_name(name, &id) != 0 || load_targets == NULL) {
     return 0;
   }
 
-  bytes_read = read_cb(cb_arg, store_blob, sizeof(store_blob));
+  parameter = parameter_definition(id);
+  expected_size = PARAMETER_BYTE_COUNT(parameter->word_count);
+  if (load_targets[id] == NULL || len != expected_size) {
+    LOG_WRN("Ignoring DSP parameter %u with length %zu; expected %zu", id, len, expected_size);
+    return 0;
+  }
+
+  bytes_read = read_cb(cb_arg, load_targets[id], expected_size);
   if (bytes_read < 0) {
-    load_result = (int)bytes_read;
+    if (load_result == 0) {
+      load_result = (int)bytes_read;
+    }
     return 0;
   }
-  if (bytes_read != sizeof(store_blob)) {
-    load_result = -EIO;
-    return 0;
-  }
-
-  load_result = decode_store(store_blob, &loaded_snapshot);
-  if (load_result != 0) {
-    LOG_WRN("Ignoring invalid persistent DSP record: %d", load_result);
+  if (bytes_read != expected_size) {
+    LOG_WRN("Incomplete DSP parameter %u: read %zd of %zu bytes", id, bytes_read, expected_size);
+    if (load_result == 0) {
+      load_result = -EIO;
+    }
+  } else {
+    loaded_parameter_mask |= BIT(id - 1U);
   }
 
   return 0;
@@ -139,11 +115,11 @@ int dsp_parameter_settings_init(void)
   return 0;
 }
 
-int dsp_parameter_settings_load(struct dsp_parameter_settings_snapshot* snapshot)
+int dsp_parameter_settings_load(uint8_t* const parameter_data[DSP_PARAMETER_COUNT + 1U])
 {
   int ret;
 
-  if (snapshot == NULL) {
+  if (parameter_data == NULL) {
     return -EINVAL;
   }
 
@@ -152,8 +128,11 @@ int dsp_parameter_settings_load(struct dsp_parameter_settings_snapshot* snapshot
     return ret;
   }
 
-  load_result = -ENOENT;
+  load_result = 0;
+  loaded_parameter_mask = 0U;
+  load_targets = parameter_data;
   ret = settings_load_subtree(parameter_settings.name);
+  load_targets = NULL;
   if (ret != 0) {
     return ret;
   }
@@ -161,16 +140,40 @@ int dsp_parameter_settings_load(struct dsp_parameter_settings_snapshot* snapshot
     return load_result;
   }
 
-  *snapshot = loaded_snapshot;
+  for (size_t parameter_index = 0U; parameter_index < DSP_PARAMETER_COUNT; parameter_index++) {
+    const struct dsp_parameter* parameter = &dsp_parameter_contract[parameter_index];
+
+    if ((loaded_parameter_mask & BIT(parameter->id - 1U)) != 0U) {
+      continue;
+    }
+
+    ret = dsp_parameter_settings_save(
+        parameter->id, parameter_data[parameter->id], PARAMETER_BYTE_COUNT(parameter->word_count));
+    if (ret != 0) {
+      return ret;
+    }
+  }
+
   return 0;
 }
 
-int dsp_parameter_settings_save(const struct dsp_parameter_settings_snapshot* snapshot)
+int dsp_parameter_settings_save(uint8_t id, const uint8_t* data, size_t size)
 {
-  if (snapshot == NULL) {
+  const struct dsp_parameter* parameter = parameter_definition(id);
+  char key[SETTINGS_KEY_SIZE];
+  int key_length;
+
+  if (parameter == NULL) {
+    return -ENOENT;
+  }
+  if (data == NULL || size != PARAMETER_BYTE_COUNT(parameter->word_count)) {
     return -EINVAL;
   }
 
-  encode_store(store_blob, snapshot);
-  return settings_save_one(SETTINGS_KEY, store_blob, sizeof(store_blob));
+  key_length = snprintf(key, sizeof(key), SETTINGS_SUBTREE "/%u", id);
+  if (key_length < 0 || (size_t)key_length >= sizeof(key)) {
+    return -EINVAL;
+  }
+
+  return settings_save_one(key, data, size);
 }

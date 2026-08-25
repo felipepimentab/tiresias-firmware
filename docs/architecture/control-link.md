@@ -109,16 +109,18 @@ MVP constraints:
 - one outstanding parameter operation;
 - one DSP word per correlated `GET_PARAMETER` or `SET_PARAMETER` request;
 - the workstation exposes writes for the six fixed scalar controls; all 323 catalog words are
-  mirrored in RAM and persisted together;
-- every successful SET is committed as one versioned, contract-bound, CRC-checked settings
-  record after the codec write succeeds and before RAM state and revision advance;
+  mirrored as per-parameter, DSP-order byte arrays in RAM;
+- each parameter is persisted independently as raw bytes under its own stable-ID Zephyr
+  Settings key; a successful SET saves only the complete parameter that owns the changed word;
 - the parameter controller decides when values are loaded and saved, while the DSP parameter
-  settings adapter exclusively owns the Zephyr Settings handler and persistent record format;
-- startup uses the generated SigmaStudio image as the default RAM state. An absent or invalid
-  record is replaced with those defaults; a valid non-default record is copied to RAM and
-  written in full to codec parameter memory;
-- internal routines that already changed the codec ask the controller to save the complete
-  pending image and then update the RAM mirror;
+  settings adapter owns the Zephyr Settings keys and copies data without interpreting it;
+- startup copies the generated SigmaStudio defaults into the RAM arrays, then directly overlays
+  any independently stored parameters. Missing or malformed entries leave their defaults in
+  place and are saved independently, then the resulting RAM values are written to codec
+  parameter memory;
+- internal routines that already changed the codec ask the controller to update and save only
+  the affected RAM parameter;
+- the protocol revision is boot-local and is not persisted in flash;
 - parameter value constraints are workstation-owned during the trusted PoC;
 - no BLE raw RAM/register access, batch atomicity, or whole-profile replacement.
 

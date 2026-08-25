@@ -9,10 +9,12 @@
  * @brief Runtime lifecycle controller for the fixed DSP parameter contract.
  *
  * The controller keeps the fixed catalog's complete parameter image synchronized
- * across three locations: its RAM mirror, the nRF5340's internal flash, and the
- * ADAU1787's parameter memory. It owns lifecycle ordering and the monotonically
- * increasing parameter revision; storage mechanics remain private to
- * dsp_parameter_settings and codec I/O remains private to codec_adapter.
+ * across three locations: per-parameter byte arrays in RAM, the nRF5340's
+ * internal flash, and the ADAU1787's parameter memory. RAM and flash retain
+ * words byte-for-byte in ADAU1787 control-port order. The controller owns
+ * lifecycle ordering and the boot-local, monotonically increasing parameter
+ * revision; storage mechanics remain private to dsp_parameter_settings and
+ * codec I/O remains private to codec_adapter.
  *
  * Calls that access or mutate parameter state are serialized internally. The
  * module must be initialized before serving parameter requests.
@@ -29,11 +31,9 @@
  *
  * Call this after the codec driver has loaded the generated SigmaStudio image.
  * The controller first copies the catalog parameters' SigmaStudio defaults into
- * RAM, then loads the complete persistent snapshot from flash. If no valid
- * snapshot exists, the defaults are saved to flash and the codec is left alone
- * because it already contains those values. If a valid snapshot exists, it
- * becomes the RAM image; when it differs from the defaults, every parameter word
- * is written to the codec before initialization completes.
+ * RAM, then loads each independently stored parameter directly into its matching
+ * byte array. Missing settings leave that parameter at its default. The complete
+ * resulting RAM state is written to the codec before initialization completes.
  *
  * A failed restore leaves the controller unavailable rather than exposing an
  * image that is known not to be synchronized. Repeated successful calls are
@@ -48,8 +48,10 @@ int dsp_parameter_controller_init(void);
 /**
  * @brief Read one word of a catalog parameter.
  *
- * The controller resolves @p id through the catalog and returns the word from
- * its synchronized RAM mirror. Reads never perform codec or flash I/O.
+ * The controller resolves @p id through the catalog, reads the raw word from
+ * its synchronized parameter byte array, and converts it to the signed value
+ * representation used by the Control Link API. Reads never perform codec or
+ * flash I/O.
  *
  * @param[in] id Stable parameter ID from the fixed contract.
  * @param[in] word_index Zero-based word offset within the parameter.
@@ -69,10 +71,10 @@ int dsp_parameter_controller_get(uint8_t id, uint8_t word_index, int32_t* value,
  * @brief Apply a remotely supplied parameter value to all three mirrors.
  *
  * This is the GATT/external-update path. The controller first writes the new
- * word to the codec, then saves the complete pending image to flash, and only
- * then updates its RAM mirror and revision. A codec failure leaves flash and RAM
- * unchanged. If persistence fails after the codec write, the controller attempts
- * to restore the codec's previous value and leaves flash and RAM unchanged.
+ * word to the codec, updates its owning RAM parameter, and saves that parameter's
+ * byte array to its independent flash key. A codec failure leaves flash and RAM
+ * unchanged. If persistence fails after the codec write, the controller restores
+ * the RAM word and attempts to restore the codec's previous value.
  *
  * The PoC trusts the workstation to provide correctly encoded values and does
  * not perform firmware-side range, step, or prescription validation. Only
@@ -98,8 +100,8 @@ int dsp_parameter_controller_set(uint8_t id, uint8_t word_index, int32_t value, 
  *
  * Internal routines call this after successfully writing the codec. The codec
  * operation remains the caller's responsibility and is expected to use the
- * Codec Adapter. The controller persists the complete parameter image and only
- * then updates its RAM mirror and revision. It does not write the codec.
+ * Codec Adapter. The controller updates the owning RAM parameter and persists
+ * only that parameter. It does not write the codec.
  *
  * @param[in] id Stable parameter ID from the fixed contract.
  * @param[in] word_index Zero-based word offset within the parameter.
@@ -118,9 +120,9 @@ int dsp_parameter_controller_mirror_codec_update(uint8_t id, uint8_t word_index,
 /**
  * @brief Get the revision of the committed runtime parameter state.
  *
- * The revision is restored from persistent storage during initialization and
- * increments once for every successful remote or internal update that changes
- * a value. Failed and no-op updates do not advance it.
+ * The revision starts at zero on each boot and increments once for every
+ * successful remote or internal update that changes a value. Failed and no-op
+ * updates do not advance it.
  *
  * @return Current parameter revision.
  */

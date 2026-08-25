@@ -6,17 +6,11 @@
 
 /**
  * @file
- * @brief Flash persistence adapter for DSP parameter snapshots.
+ * @brief Flash persistence adapter for independent DSP parameters.
  *
- * This module is the exclusive owner of the Zephyr Settings integration and
- * the versioned binary record used to retain DSP parameter state. It registers
- * the settings handler, serializes and deserializes complete snapshots, and
- * verifies record framing, contract compatibility, and CRC integrity.
- *
- * The adapter deliberately has no parameter lifecycle policy. It does not
- * choose initial values, interpret individual values, access the codec,
- * increment revisions, or decide when a load or save should occur. Those
- * responsibilities belong to dsp_parameter_controller.
+ * Each parameter is stored under its own Zephyr Settings key as opaque bytes
+ * in ADAU1787 control-port order. This module does not create a combined image,
+ * interpret values, access the codec, or manage the runtime revision.
  */
 
 #ifndef DSP_PARAMETER_SETTINGS_H
@@ -24,22 +18,8 @@
 
 #include "dsp_parameter_catalog.h"
 
+#include <stddef.h>
 #include <stdint.h>
-
-/**
- * @brief Complete persistent state exchanged with the parameter controller.
- *
- * Values are stored by ascending parameter ID and then ascending word index. A
- * snapshot is an atomic persistence unit: callers load or replace every DSP
- * parameter word and the associated revision together.
- */
-struct dsp_parameter_settings_snapshot {
-  /** Revision associated with the committed parameter values. */
-  uint32_t revision;
-
-  /** Every raw integer or signed Q5.23 word in fixed catalog order. */
-  int32_t values[DSP_PARAMETER_WORD_COUNT];
-};
 
 /**
  * @brief Register the module's Zephyr Settings handler.
@@ -53,40 +33,36 @@ struct dsp_parameter_settings_snapshot {
 int dsp_parameter_settings_init(void);
 
 /**
- * @brief Load and decode the persistent parameter snapshot from flash.
+ * @brief Load stored parameters directly into their RAM byte arrays.
  *
- * A successful load verifies the record magic, storage version, encoded size,
- * fixed DSP contract CRC, value count, reserved fields, and record CRC before
- * copying data to @p snapshot. Parameter values are treated as opaque signed
- * words.
+ * Each existing `tiresias/parameters/<id>` entry is copied directly to the
+ * array indexed by that parameter ID. Missing or malformed entries leave their
+ * destination arrays unchanged, allowing SigmaStudio defaults to remain in
+ * RAM. Defaults for missing or malformed entries are then saved under their
+ * own independent keys. This operation is intended for controller
+ * initialization and is not reentrant.
  *
- * This operation is intended for controller initialization and is not
- * reentrant. The output snapshot is modified only on success.
+ * @param[in,out] parameter_data Parameter arrays indexed by stable parameter ID.
  *
- * @param[out] snapshot Destination for the decoded persistent state.
- *
- * @retval 0 A valid snapshot was loaded.
- * @retval -EINVAL @p snapshot is NULL or the stored record is incompatible or
- * malformed.
- * @retval -ENOENT No parameter record exists.
- * @retval -EIO The settings backend returned an incomplete record.
- * @return Another negative errno-style value from the Zephyr Settings backend.
+ * @retval 0 All readable settings entries were loaded.
+ * @retval -EINVAL @p parameter_data is NULL.
+ * @retval -EIO A settings entry could not be read completely.
+ * @return Another negative errno-style value from Zephyr Settings.
  */
-int dsp_parameter_settings_load(struct dsp_parameter_settings_snapshot* snapshot);
+int dsp_parameter_settings_load(uint8_t* const parameter_data[DSP_PARAMETER_COUNT + 1U]);
 
 /**
- * @brief Encode and save a complete parameter snapshot to flash.
+ * @brief Save one complete RAM parameter to its independent flash key.
  *
- * The record is stored under the module-owned settings key and includes its
- * framing metadata and CRC. This function does not validate parameter values or
- * revision policy; the controller must provide a coherent snapshot.
+ * @param[in] id Stable parameter ID.
+ * @param[in] data Complete parameter bytes in DSP control-port order.
+ * @param[in] size Size of @p data; must match the catalog word count.
  *
- * @param[in] snapshot Complete state to persist.
- *
- * @retval 0 The settings backend accepted the complete record.
- * @retval -EINVAL @p snapshot is NULL.
- * @return Another negative errno-style value from the Zephyr Settings backend.
+ * @retval 0 The settings backend accepted the parameter.
+ * @retval -ENOENT @p id is not part of the fixed catalog.
+ * @retval -EINVAL @p data is NULL or @p size does not match the catalog.
+ * @return Another negative errno-style value from Zephyr Settings.
  */
-int dsp_parameter_settings_save(const struct dsp_parameter_settings_snapshot* snapshot);
+int dsp_parameter_settings_save(uint8_t id, const uint8_t* data, size_t size);
 
 #endif /* DSP_PARAMETER_SETTINGS_H */

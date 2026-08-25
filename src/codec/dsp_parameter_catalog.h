@@ -36,6 +36,9 @@
 /** Total number of 32-bit words across every parameter in the fixed contract. */
 #define DSP_PARAMETER_WORD_COUNT (2U + 8U * 34U + 4U + 45U)
 
+/** Total number of raw bytes across every parameter in the fixed contract. */
+#define DSP_PARAMETER_BYTE_COUNT (DSP_PARAMETER_WORD_COUNT * 4U)
+
 /**
  * @brief Public parameter capability and representation flags.
  *
