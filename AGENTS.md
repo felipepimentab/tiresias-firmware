@@ -11,6 +11,11 @@ Zephyr/NCS firmware for Tiresias DK.
 - Preserve existing Zephyr style and error handling patterns.
 - Do not rewrite public APIs unless explicitly requested.
 - Do not revert unrelated worktree changes.
+- Leave `src/codec/hw_codec.c` unchanged. It is the legacy, tested, known-good
+  hardware-codec implementation and must be used only as a behavioral reference.
+- Implement new hardware access through `src/codec/codec_adapter.c`, using
+  `hw_codec.c` as the reference implementation. The adapter is intended to
+  replace `hw_codec.c` completely once it is implemented and validated.
 
 ## Useful Checks
 Allowed:
