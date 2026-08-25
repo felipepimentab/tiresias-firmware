@@ -196,6 +196,23 @@ int adau1787_init(void)
   return 0;
 }
 
+int adau1787_param_default_read(sub_addr_t start_addr, uint8_t* data, size_t len)
+{
+  size_t offset;
+
+  if (data == NULL || len == 0U || start_addr < PARAM_ADDR_IC_1_Sigma) {
+    return -EINVAL;
+  }
+
+  offset = start_addr - PARAM_ADDR_IC_1_Sigma;
+  if (offset + len > PARAM_SIZE_IC_1_Sigma) {
+    return -ERANGE;
+  }
+
+  memcpy(data, &Param_Data_IC_1_Sigma[offset], len);
+  return 0;
+}
+
 // Write operations
 
 int adau1787_write(sub_addr_t start_addr, uint8_t* data, size_t data_len)

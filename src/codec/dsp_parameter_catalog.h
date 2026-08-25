@@ -33,8 +33,8 @@
 /** Number of entries in @ref dsp_parameter_contract. */
 #define DSP_PARAMETER_COUNT 15U
 
-/** Number of scalar parameter values retained in persistent storage. */
-#define DSP_PARAMETER_PERSISTENT_COUNT 6U
+/** Total number of 32-bit words across every parameter in the fixed contract. */
+#define DSP_PARAMETER_WORD_COUNT (2U + 8U * 34U + 4U + 45U)
 
 /**
  * @brief Public parameter capability and representation flags.

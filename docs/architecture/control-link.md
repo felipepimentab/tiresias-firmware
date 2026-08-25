@@ -4,7 +4,7 @@
 
 Implemented MVP: shared Bluetooth initialization, connectable advertising, one peripheral
 ACL, Device Information Service, the custom Tiresias service, fixed-contract parameter
-access, scalar internal-flash persistence, advertising restart, and LED 1 indication.
+access, complete parameter-image persistence, advertising restart, and LED 1 indication.
 
 ## Service boundaries
 
@@ -108,22 +108,27 @@ MVP constraints:
 
 - one outstanding parameter operation;
 - one DSP word per correlated `GET_PARAMETER` or `SET_PARAMETER` request;
-- only the six fixed scalar controls are writable and persisted;
+- the workstation exposes writes for the six fixed scalar controls; all 323 catalog words are
+  mirrored in RAM and persisted together;
 - every successful SET is committed as one versioned, contract-bound, CRC-checked settings
-  record before RAM state and revision advance;
+  record after the codec write succeeds and before RAM state and revision advance;
 - the parameter controller decides when values are loaded and saved, while the DSP parameter
   settings adapter exclusively owns the Zephyr Settings handler and persistent record format;
-- an empty or invalid first-boot record leaves the scalar cache zero-initialized, and readiness
-  is independent of Bluetooth startup order;
+- startup uses the generated SigmaStudio image as the default RAM state. An absent or invalid
+  record is replaced with those defaults; a valid non-default record is copied to RAM and
+  written in full to codec parameter memory;
+- internal routines that already changed the codec ask the controller to save the complete
+  pending image and then update the RAM mirror;
 - parameter value constraints are workstation-owned during the trusted PoC;
-- no raw RAM/register access, batch atomicity, or whole-profile replacement.
+- no BLE raw RAM/register access, batch atomicity, or whole-profile replacement.
 
 Codec parameter I/O goes through Codec Adapter, the common boundary directly above the
 ADAU1787 driver. Its parameter read/write operations are stubs until hardware behavior can be
-validated. The controller therefore returns cached values for the six persistent scalars,
-reports DSP failure for LUT reads, persists scalar writes without applying them, and advertises
-deferred DSP access. A future adapter implementation must define write atomicity and rollback
-before the deferred flag is removed.
+validated. Reads are served from the complete synchronized RAM mirror, including LUT words.
+Because remote updates now strictly require codec success before flash and RAM are changed,
+SET requests currently report DSP failure and commit nothing while the write stub returns
+`-ENOTSUP`. The service advertises deferred DSP access until the adapter's live read/write
+operations are implemented and hardware-validated.
 
 A device-provided dynamic catalog and a generator based on the SigmaStudio `.params` export
 are post-MVP improvements. Compatibility negotiation for a dynamic catalog can be designed if
@@ -181,8 +186,9 @@ stack, queue, controller-memory, and underrun measurements justify expansion.
 
 ## Delivery order
 
-1. Implemented: fixed contract, Status, indexed reads, scalar writes, and persistence.
-2. Next: hardware validation and DSP/flash power-loss reconciliation.
+1. Implemented: fixed contract, Status, indexed RAM reads, complete-image persistence, and the
+   three-location synchronization lifecycle.
+2. Next: Codec Adapter parameter-write implementation and hardware validation.
 3. Optional dynamic contract generation, bulk writes, and whole-profile persistence.
 4. BASS/Scan Delegator integration and simultaneous control/broadcast testing.
 5. Production roles, audit-safe records, stress tests, and recovery hardening.

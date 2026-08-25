@@ -8,11 +8,11 @@
  * @file
  * @brief Runtime lifecycle controller for the fixed DSP parameter contract.
  *
- * The controller coordinates codec access, persistent snapshots, cached scalar
- * values, and the monotonically increasing parameter revision. It decides when
- * parameters are loaded, read, written, committed, or rolled back; storage
- * mechanics remain private to dsp_parameter_settings and codec I/O remains
- * private to codec_adapter.
+ * The controller keeps the fixed catalog's complete parameter image synchronized
+ * across three locations: its RAM mirror, the nRF5340's internal flash, and the
+ * ADAU1787's parameter memory. It owns lifecycle ordering and the monotonically
+ * increasing parameter revision; storage mechanics remain private to
+ * dsp_parameter_settings and codec I/O remains private to codec_adapter.
  *
  * Calls that access or mutate parameter state are serialized internally. The
  * module must be initialized before serving parameter requests.
@@ -27,52 +27,52 @@
 /**
  * @brief Initialize the runtime parameter state.
  *
- * The controller starts with zero-initialized cached values and then asks the
- * settings adapter for a persistent snapshot. A missing, incompatible, or
- * malformed snapshot leaves that initial state active. Other settings backend
- * failures abort initialization. Repeated successful calls are harmless.
+ * Call this after the codec driver has loaded the generated SigmaStudio image.
+ * The controller first copies the catalog parameters' SigmaStudio defaults into
+ * RAM, then loads the complete persistent snapshot from flash. If no valid
+ * snapshot exists, the defaults are saved to flash and the codec is left alone
+ * because it already contains those values. If a valid snapshot exists, it
+ * becomes the RAM image; when it differs from the defaults, every parameter word
+ * is written to the codec before initialization completes.
  *
- * Initialization restores the controller's cached scalar state and revision;
- * it does not proactively write the complete snapshot to the codec.
+ * A failed restore leaves the controller unavailable rather than exposing an
+ * image that is known not to be synchronized. Repeated successful calls are
+ * harmless.
  *
- * @retval 0 The controller is ready, using stored or zero-initialized values.
- * @return A negative errno-style settings error when initialization fails.
+ * @retval 0 RAM, flash, and codec parameter memory are synchronized.
+ * @return A negative errno-style value when defaults cannot be read, flash
+ * cannot be loaded or initialized, or codec restoration fails.
  */
 int dsp_parameter_controller_init(void);
 
 /**
  * @brief Read one word of a catalog parameter.
  *
- * The controller resolves @p id through the catalog and normally reads the word
- * from the codec through codec_adapter. While codec parameter access is
- * unsupported, persistent single-word parameters fall back to their cached
- * values. Multiword parameters have no cached fallback.
+ * The controller resolves @p id through the catalog and returns the word from
+ * its synchronized RAM mirror. Reads never perform codec or flash I/O.
  *
  * @param[in] id Stable parameter ID from the fixed contract.
  * @param[in] word_index Zero-based word offset within the parameter.
  * @param[out] value Destination for the integer or signed Q5.23 word.
  * @param[out] revision Destination for the current parameter revision. It is
- * written after a valid request reaches the serialized read operation, even if
- * codec access ultimately fails.
+ * written together with the value while the RAM mirror is locked.
  *
- * @retval 0 The value was read from the codec or persistent scalar cache.
+ * @retval 0 The value and revision were read from the RAM mirror.
  * @retval -ENOENT @p id is not part of the catalog.
  * @retval -EINVAL @p value or @p revision is NULL.
  * @retval -ERANGE @p word_index is outside the parameter.
- * @retval -EREMOTE Codec access failed or no cached fallback exists.
+ * @retval -EAGAIN Startup synchronization has not completed.
  */
 int dsp_parameter_controller_get(uint8_t id, uint8_t word_index, int32_t* value, uint32_t* revision);
 
 /**
- * @brief Apply and persist a new scalar parameter value.
+ * @brief Apply a remotely supplied parameter value to all three mirrors.
  *
- * A successful operation is transactional from the controller's perspective:
- * it writes the codec when codec access is available, stores the complete
- * pending snapshot, then advances the cached state and revision. If persistence
- * fails after a codec write, the controller attempts to restore the previous
- * codec value. When codec access reports -ENOTSUP, the persistent state is still
- * committed so the lifecycle can be exercised before hardware parameter
- * operations are implemented.
+ * This is the GATT/external-update path. The controller first writes the new
+ * word to the codec, then saves the complete pending image to flash, and only
+ * then updates its RAM mirror and revision. A codec failure leaves flash and RAM
+ * unchanged. If persistence fails after the codec write, the controller attempts
+ * to restore the codec's previous value and leaves flash and RAM unchanged.
  *
  * The PoC trusts the workstation to provide correctly encoded values and does
  * not perform firmware-side range, step, or prescription validation. Only
@@ -80,25 +80,47 @@ int dsp_parameter_controller_get(uint8_t id, uint8_t word_index, int32_t* value,
  *
  * @param[in] id Stable parameter ID from the fixed contract.
  * @param[in] word_index Zero-based word offset within the parameter.
- * @param[in] value New integer or signed Q5.23 scalar value.
+ * @param[in] value New integer or signed Q5.23 word.
  * @param[out] revision Destination for the new revision on success.
  *
- * @retval 0 The value was persisted and the runtime state was committed.
+ * @retval 0 Codec, flash, and RAM contain the new value.
  * @retval -ENOENT @p id is not part of the catalog.
  * @retval -EINVAL @p revision is NULL.
- * @retval -EACCES The parameter is not one of the persisted PoC scalars.
  * @retval -ERANGE The word index is outside the parameter.
+ * @retval -EAGAIN Startup synchronization has not completed.
  * @retval -EREMOTE Codec access failed.
  * @return Another negative errno-style value when persistence fails.
  */
 int dsp_parameter_controller_set(uint8_t id, uint8_t word_index, int32_t value, uint32_t* revision);
 
 /**
+ * @brief Mirror a parameter value already applied to the codec internally.
+ *
+ * Internal routines call this after successfully writing the codec. The codec
+ * operation remains the caller's responsibility and is expected to use the
+ * Codec Adapter. The controller persists the complete parameter image and only
+ * then updates its RAM mirror and revision. It does not write the codec.
+ *
+ * @param[in] id Stable parameter ID from the fixed contract.
+ * @param[in] word_index Zero-based word offset within the parameter.
+ * @param[in] value Value already present in codec parameter memory.
+ * @param[out] revision Destination for the committed revision.
+ *
+ * @retval 0 Flash and RAM now mirror the codec value.
+ * @retval -ENOENT @p id is not part of the catalog.
+ * @retval -EINVAL @p revision is NULL.
+ * @retval -ERANGE @p word_index is outside the parameter.
+ * @retval -EAGAIN The controller has not completed startup synchronization.
+ * @return Another negative errno-style value when persistence fails.
+ */
+int dsp_parameter_controller_mirror_codec_update(uint8_t id, uint8_t word_index, int32_t value, uint32_t* revision);
+
+/**
  * @brief Get the revision of the committed runtime parameter state.
  *
  * The revision is restored from persistent storage during initialization and
- * increments once for every successful set operation. Failed operations do not
- * advance it.
+ * increments once for every successful remote or internal update that changes
+ * a value. Failed and no-op updates do not advance it.
  *
  * @return Current parameter revision.
  */
@@ -107,7 +129,7 @@ uint32_t dsp_parameter_controller_revision(void);
 /**
  * @brief Report whether parameter initialization completed successfully.
  *
- * @retval true Initial state or a valid stored snapshot has been loaded.
+ * @retval true RAM, flash, and codec parameter memory are synchronized.
  * @retval false Initialization has not completed successfully.
  */
 bool dsp_parameter_controller_loaded(void);

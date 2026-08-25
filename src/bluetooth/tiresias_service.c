@@ -8,6 +8,7 @@
 
 #include "dsp_parameter_catalog.h"
 #include "dsp_parameter_controller.h"
+#include "dsp_parameter_settings.h"
 
 #include <errno.h>
 #include <zephyr/bluetooth/gatt.h>
@@ -369,7 +370,7 @@ int tiresias_service_init(void)
     return 0;
   }
 
-  ret = dsp_parameter_controller_init();
+  ret = dsp_parameter_settings_init();
   if (ret != 0) {
     return ret;
   }

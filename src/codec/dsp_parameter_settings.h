@@ -29,25 +29,36 @@
 /**
  * @brief Complete persistent state exchanged with the parameter controller.
  *
- * Values are stored in the controller's fixed persistent-parameter order. A
- * snapshot is an atomic persistence unit: callers load or replace all values
- * and the associated revision together.
+ * Values are stored by ascending parameter ID and then ascending word index. A
+ * snapshot is an atomic persistence unit: callers load or replace every DSP
+ * parameter word and the associated revision together.
  */
 struct dsp_parameter_settings_snapshot {
   /** Revision associated with the committed parameter values. */
   uint32_t revision;
 
-  /** Raw integer or signed Q5.23 values in fixed persistent catalog order. */
-  int32_t values[DSP_PARAMETER_PERSISTENT_COUNT];
+  /** Every raw integer or signed Q5.23 word in fixed catalog order. */
+  int32_t values[DSP_PARAMETER_WORD_COUNT];
 };
+
+/**
+ * @brief Register the module's Zephyr Settings handler.
+ *
+ * This must run before the application performs a global settings load. It is
+ * idempotent and does not read flash by itself.
+ *
+ * @retval 0 The handler is registered or was already registered.
+ * @return A negative errno-style value from Zephyr Settings registration.
+ */
+int dsp_parameter_settings_init(void);
 
 /**
  * @brief Load and decode the persistent parameter snapshot from flash.
  *
- * The settings handler is registered lazily on the first call. A successful
- * load verifies the record magic, storage version, encoded size, fixed DSP
- * contract CRC, value count, reserved fields, and record CRC before copying
- * data to @p snapshot. Parameter values are treated as opaque signed words.
+ * A successful load verifies the record magic, storage version, encoded size,
+ * fixed DSP contract CRC, value count, reserved fields, and record CRC before
+ * copying data to @p snapshot. Parameter values are treated as opaque signed
+ * words.
  *
  * This operation is intended for controller initialization and is not
  * reentrant. The output snapshot is modified only on success.

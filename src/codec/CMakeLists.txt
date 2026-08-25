@@ -14,4 +14,5 @@ target_sources(app PRIVATE
 )
 
 target_sources_ifdef(CONFIG_AUDIO_CODEC_ADAU1787 app PRIVATE
-                     ${CMAKE_CURRENT_SOURCE_DIR}/hw_codec.c)
+                     ${CMAKE_CURRENT_SOURCE_DIR}/hw_codec.c
+                     ${CMAKE_CURRENT_SOURCE_DIR}/param_defaults.c)

@@ -77,6 +77,17 @@ typedef uint16_t sub_addr_t;
 int adau1787_init(void);
 
 /**
+ * @brief Copy parameter defaults from the generated SigmaStudio image.
+ *
+ * @param start_addr Parameter-memory byte address of the first requested byte.
+ * @param[out] data Destination buffer.
+ * @param len Number of bytes to copy.
+ *
+ * @return 0 on success, negative errno-style value for invalid arguments.
+ */
+int adau1787_param_default_read(sub_addr_t start_addr, uint8_t* data, size_t len);
+
+/**
  * @brief Read and log the ADAU1787 STATUS2 register.
  */
 void adau1787_log_status_2(void);
