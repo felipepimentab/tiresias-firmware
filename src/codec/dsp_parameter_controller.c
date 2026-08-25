@@ -9,7 +9,6 @@
 #include "codec_adapter.h"
 #include "dsp_parameter_catalog.h"
 #include "dsp_parameter_settings.h"
-#include "param_defaults.h"
 
 #include <errno.h>
 #include <string.h>
@@ -68,18 +67,6 @@ BUILD_ASSERT(sizeof(param_adc_select) + sizeof(param_source_select) + sizeof(par
             + sizeof(param_phase_comp_gain_3) + sizeof(param_output_headroom_gain) + sizeof(param_soft_clip_lut)
         == DSP_PARAMETER_BYTE_COUNT,
     "Parameter byte arrays must cover the complete catalog");
-
-static const struct dsp_parameter* parameter_definition(uint8_t id)
-{
-  const struct dsp_parameter* parameter;
-
-  if (id == 0U || id > DSP_PARAMETER_COUNT) {
-    return NULL;
-  }
-
-  parameter = &dsp_parameter_contract[id - 1U];
-  return parameter->id == id ? parameter : NULL;
-}
 
 static uint8_t* parameter_bytes(const struct dsp_parameter* parameter, uint8_t byte_offset)
 {
@@ -220,7 +207,7 @@ out:
 
 int dsp_parameter_controller_get(uint8_t id, uint8_t byte_offset, uint8_t* data, size_t size, uint32_t* revision)
 {
-  const struct dsp_parameter* parameter = parameter_definition(id);
+  const struct dsp_parameter* parameter = dsp_parameter_definition(id);
 
   if (parameter == NULL) {
     return -ENOENT;
@@ -245,7 +232,7 @@ int dsp_parameter_controller_get(uint8_t id, uint8_t byte_offset, uint8_t* data,
 
 int dsp_parameter_controller_set(uint8_t id, uint8_t byte_offset, const uint8_t* data, size_t size, uint32_t* revision)
 {
-  const struct dsp_parameter* parameter = parameter_definition(id);
+  const struct dsp_parameter* parameter = dsp_parameter_definition(id);
   int rollback_ret;
   int ret;
 
@@ -296,7 +283,7 @@ int dsp_parameter_controller_set(uint8_t id, uint8_t byte_offset, const uint8_t*
 int dsp_parameter_controller_mirror_codec_update(
     uint8_t id, uint8_t byte_offset, const uint8_t* data, size_t size, uint32_t* revision)
 {
-  const struct dsp_parameter* parameter = parameter_definition(id);
+  const struct dsp_parameter* parameter = dsp_parameter_definition(id);
   int ret;
 
   if (data == NULL || revision == NULL) {

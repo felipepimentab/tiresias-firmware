@@ -18,8 +18,9 @@
  * Human-readable names are intentionally kept in the matching workstation
  * contract rather than transmitted by the firmware.
  *
- * This module contains immutable metadata only. It does not own runtime values,
- * persistence, BLE request handling, or codec access policy.
+ * This module owns immutable metadata and zero-copy views of generated defaults.
+ * It does not own runtime values, persistence, BLE request handling, or codec
+ * access policy.
  */
 
 #ifndef DSP_PARAMETER_CATALOG_H
@@ -164,6 +165,16 @@ struct dsp_parameter {
 extern const struct dsp_parameter dsp_parameter_contract[DSP_PARAMETER_COUNT];
 
 /**
+ * @brief Find a parameter definition by stable ID.
+ *
+ * @param id Stable parameter ID from the fixed contract.
+ *
+ * @return Pointer to the immutable catalog entry, or NULL when @p id is not in
+ * the catalog.
+ */
+const struct dsp_parameter* dsp_parameter_definition(uint8_t id);
+
+/**
  * @brief Firmware-only DSP addresses indexed directly by parameter ID.
  *
  * Index zero is unused because public parameter IDs start at one. Each other
@@ -171,5 +182,19 @@ extern const struct dsp_parameter dsp_parameter_contract[DSP_PARAMETER_COUNT];
  * addresses are never transmitted over BLE.
  */
 extern const uint16_t dsp_parameter_addresses[DSP_PARAMETER_COUNT + 1U];
+
+/**
+ * @brief Get a zero-copy view of a catalog parameter's SigmaStudio default.
+ *
+ * The returned pointer addresses the parameter's first byte in the generated
+ * `Param_Data_IC_1_Sigma` array. Its byte length is available from the matching
+ * catalog entry.
+ *
+ * @param id Stable parameter ID from the fixed contract.
+ *
+ * @return Pointer to the parameter's generated default bytes, or NULL when
+ * @p id is outside the catalog or the ADAU1787 image is not enabled.
+ */
+const uint8_t* dsp_parameter_default(uint8_t id);
 
 #endif /* DSP_PARAMETER_CATALOG_H */

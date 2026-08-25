@@ -25,18 +25,6 @@ static bool settings_registered;
 
 BUILD_ASSERT(DSP_PARAMETER_COUNT <= 32U, "Loaded parameter mask must contain every parameter ID");
 
-static const struct dsp_parameter* parameter_definition(uint8_t id)
-{
-  const struct dsp_parameter* parameter;
-
-  if (id == 0U || id > DSP_PARAMETER_COUNT) {
-    return NULL;
-  }
-
-  parameter = &dsp_parameter_contract[id - 1U];
-  return parameter->id == id ? parameter : NULL;
-}
-
 static int parameter_id_from_name(const char* name, uint8_t* id)
 {
   char* end;
@@ -53,7 +41,7 @@ static int parameter_id_from_name(const char* name, uint8_t* id)
   }
 
   *id = (uint8_t)parsed_id;
-  return parameter_definition(*id) == NULL ? -ENOENT : 0;
+  return dsp_parameter_definition(*id) == NULL ? -ENOENT : 0;
 }
 
 static int parameter_settings_set(const char* name, size_t len, settings_read_cb read_cb, void* cb_arg)
@@ -67,7 +55,7 @@ static int parameter_settings_set(const char* name, size_t len, settings_read_cb
     return 0;
   }
 
-  parameter = parameter_definition(id);
+  parameter = dsp_parameter_definition(id);
   expected_size = parameter->byte_count;
   if (load_targets[id] == NULL || len != expected_size) {
     LOG_WRN("Ignoring DSP parameter %u with length %zu; expected %zu", id, len, expected_size);
@@ -159,7 +147,7 @@ int dsp_parameter_settings_load(uint8_t* const parameter_data[DSP_PARAMETER_COUN
 
 int dsp_parameter_settings_save(uint8_t id, const uint8_t* data, size_t size)
 {
-  const struct dsp_parameter* parameter = parameter_definition(id);
+  const struct dsp_parameter* parameter = dsp_parameter_definition(id);
   char key[SETTINGS_KEY_SIZE];
   int key_length;
 

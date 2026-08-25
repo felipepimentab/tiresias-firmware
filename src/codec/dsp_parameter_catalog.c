@@ -7,8 +7,16 @@
 #include "dsp_parameter_catalog.h"
 
 #include "adau_1787_IC_1_SIGMA_PARAM.h"
+#if defined(CONFIG_AUDIO_CODEC_ADAU1787)
+#include "adau1787.h"
+#endif
 
 #include <zephyr/sys/util.h>
+
+#if defined(CONFIG_AUDIO_CODEC_ADAU1787)
+/* Defined by the generated SigmaStudio image included by adau1787.c. */
+extern uint8_t Param_Data_IC_1_Sigma[];
+#endif
 
 const struct dsp_parameter dsp_parameter_contract[DSP_PARAMETER_COUNT] = {
   { DSP_PARAMETER_ID_ADC_SELECT, DSP_BLOCK_ID_ADC_SELECT, 4, DSP_PARAMETER_CONTRACT_FLAG_WRITABLE },
@@ -28,6 +36,18 @@ const struct dsp_parameter dsp_parameter_contract[DSP_PARAMETER_COUNT] = {
   { DSP_PARAMETER_ID_SOFT_CLIP_LUT, DSP_BLOCK_ID_SOFT_CLIP, 180, 0 },
 };
 
+const struct dsp_parameter* dsp_parameter_definition(uint8_t id)
+{
+  const struct dsp_parameter* parameter;
+
+  if (id == 0U || id > DSP_PARAMETER_COUNT) {
+    return NULL;
+  }
+
+  parameter = &dsp_parameter_contract[id - 1U];
+  return parameter->id == id ? parameter : NULL;
+}
+
 const uint16_t dsp_parameter_addresses[DSP_PARAMETER_COUNT + 1U] = {
   [DSP_PARAMETER_ID_ADC_SELECT] = MOD_ADCSELECT_MONOSWSLEW_ADDR,
   [DSP_PARAMETER_ID_SOURCE_SELECT] = MOD_SOURCESELECT_STEREOSWSLEW_ADDR,
@@ -45,6 +65,21 @@ const uint16_t dsp_parameter_addresses[DSP_PARAMETER_COUNT + 1U] = {
   [DSP_PARAMETER_ID_OUTPUT_HEADROOM_GAIN] = MOD_OUTPUTHEADROOM_GAIN1940ALGNS4_ADDR,
   [DSP_PARAMETER_ID_SOFT_CLIP_LUT] = MOD_SOFTCLIP_ALG0_GAINTABLE0_ADDR,
 };
+
+const uint8_t* dsp_parameter_default(uint8_t id)
+{
+#if defined(CONFIG_AUDIO_CODEC_ADAU1787)
+  if (dsp_parameter_definition(id) == NULL) {
+    return NULL;
+  }
+
+  return &Param_Data_IC_1_Sigma[dsp_parameter_addresses[id] - ADAU1787_PARAM_RAM_BASE];
+#else
+  ARG_UNUSED(id);
+
+  return NULL;
+#endif
+}
 
 BUILD_ASSERT(sizeof(struct dsp_parameter) == 4U, "The fixed contract fingerprint requires four-byte entries");
 BUILD_ASSERT(DSP_PARAMETER_ID_SOFT_CLIP_LUT == DSP_PARAMETER_COUNT, "Parameter IDs must remain dense");

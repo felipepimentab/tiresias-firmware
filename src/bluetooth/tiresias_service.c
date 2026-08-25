@@ -295,11 +295,9 @@ static void process_request(const struct tiresias_request* request)
     return;
   }
 
-  if (request->parameter_id > 0U && request->parameter_id <= DSP_PARAMETER_COUNT) {
-    parameter = &dsp_parameter_contract[request->parameter_id - 1U];
-    if (parameter->id == request->parameter_id && request->byte_offset < parameter->byte_count) {
-      size = MIN(sizeof(data), parameter->byte_count - request->byte_offset);
-    }
+  parameter = dsp_parameter_definition(request->parameter_id);
+  if (parameter != NULL && request->byte_offset < parameter->byte_count) {
+    size = MIN(sizeof(data), parameter->byte_count - request->byte_offset);
   }
 
   if (setting) {
