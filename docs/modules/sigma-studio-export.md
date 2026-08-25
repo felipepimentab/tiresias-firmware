@@ -72,15 +72,9 @@ parameter. A parameter is typically represented by macros whose names end in `_A
 The `_ADDR` macros already include the `0x2000` offset and can be used directly when
 writing individual parameter words.
 
-The `_FIXPT` macros represent the 32-bit Q5.23 fixed-point type used by the DSP. They require additional handling before their values can be written:
-
-- serialize the 32-bit value into a big-endian byte array;
-- for negative values, clear the upper nibble before transmission.
-
-The second step is necessary because SigmaStudio sign-extends the exported 28-bit value to
-32 bits. As a result, a negative `_FIXPT` value has its upper bits set. The ADAU1787
-external-interface format instead requires the 28-bit parameter word to be zero-padded to
-32 bits.
+The firmware parameter subsystem does not use or interpret the generated `_FIXPT`, `_VALUE`,
+or `_TYPE` macros. It copies opaque bytes directly from the generated
+`Param_Data_IC_1_Sigma` image, preserving the exact ADAU1787 control-port representation.
 
 For example, the startup buffer in `Param_Data_IC_1_Sigma` encodes a negative value as:
 
@@ -88,7 +82,8 @@ For example, the startup buffer in `Param_Data_IC_1_Sigma` encodes a negative va
 {0x0F, 0x87, 0xE5, 0x5F}
 ```
 
-The corresponding `_FIXPT` macro in `adau_1787_IC_1_SIGMA_PARAM.h` is:
+SigmaStudio may also emit a numerically represented `_FIXPT` macro, but firmware must not
+derive parameter bytes from it:
 
 ```c
 0xFF87E55F

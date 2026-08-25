@@ -61,8 +61,8 @@ The service UUID is `7b9a0001-6e4f-4b2d-a9c8-4f2e6f5d1000`. Characteristic UUIDs
 |---|---|---|
 | Protocol Information (`0002`) | Read | Protocol version, capabilities, limits, contract CRC, boot ID, revision |
 | Status (`0004`) | Read, Notify | Control state, persistence state, and last operation |
-| Request (`0005`) | Write | One correlated indexed-word operation |
-| Response (`0006`) | Indicate | Correlated indexed-word result |
+| Request (`0005`) | Write | One correlated byte-offset operation |
+| Response (`0006`) | Indicate | Correlated opaque-byte result |
 
 Wire values have explicit widths and byte order; never expose native C structures. Major
 versions break compatibility, minor versions add compatible fields, and capabilities gate
@@ -73,64 +73,65 @@ All integers are little-endian. Wire layouts are fixed and encoded field by fiel
 | Value | Size | Layout |
 |---|---:|---|
 | Protocol Information | 24 | `u8 major, u8 minor, u16 length, u32 capabilities, u16 max_request, u16 max_response, u32 contract_crc, u32 boot_id, u32 revision` |
-| Request | 12 | `u8 opcode, u8 flags, u32 transaction_id, u8 parameter_id, u8 word_index, i32 value` |
-| Response | 16 | `u8 opcode, u8 result, u32 transaction_id, u8 parameter_id, u8 word_index, i32 value, u32 revision` |
-| Status | 16 | `u8 state, u8 flags, u8 last_result, u8 reserved, u32 revision, u32 last_transaction_id, u8 last_parameter_id, u8 last_word_index, u16 reserved` |
+| Request | 12 | `u8 opcode, u8 flags, u32 transaction_id, u8 parameter_id, u8 byte_offset, u8 data[4]` |
+| Response | 16 | `u8 opcode, u8 result, u32 transaction_id, u8 parameter_id, u8 byte_offset, u8 data[4], u32 revision` |
+| Status | 16 | `u8 state, u8 flags, u8 last_result, u8 reserved, u32 revision, u32 last_transaction_id, u8 last_parameter_id, u8 last_byte_offset, u16 reserved` |
 
 Protocol constants and result values are public in `tiresias_service.h`. Transaction ID zero,
-nonzero flags, and nonzero GET values are invalid. CCC, readiness, malformed-length, and busy
+nonzero flags, and nonzero GET data are invalid. CCC, readiness, malformed-length, and busy
 failures are rejected at ATT admission; every accepted request completes with one indication
-using the same nonzero transaction ID while the session remains connected. Protocol v3 uses
-the single DSP contract fingerprint CRC32 `0xf62c1808`.
+using the same nonzero transaction ID while the session remains connected. Protocol v4 uses
+the single DSP contract fingerprint CRC32 `0x22045c5c`.
 
 ## Fixed DSP contract
 
 Firmware and workstation compile the same MVP contract. Its public fingerprint is the CRC32
-of the ordered four-byte entries `parameter_id, block_id, word_count, flags`. Membership
-implies readable Q5.23 data; the writable and integer properties are opt-in flags. Names,
-constraints, and GUI grouping live in the workstation contract, while DSP addresses and
-hardware conversion remain private to firmware.
+of the ordered four-byte entries `parameter_id, block_id, byte_count, flags`. Membership
+implies readable opaque bytes; the writable property is an opt-in flag. Names and GUI grouping
+live in the workstation contract, while DSP addresses remain private to firmware. Neither side
+assigns numerical meaning, byte order, ranges, or units to parameter contents.
 
-The fixed parameters are ADC Select, Source Select, eight 34-word compressor LUTs, three
-phase-compensation gains, Output Headroom Gain, and the 45-word Soft Clip LUT. The selectors
-are writable integers. The four gains are writable Q5.23 scalars from 0 through 4 in steps of
-1/256. LUTs are readable and remain read-only until an atomic multiword write protocol exists.
+The fixed parameters are ADC Select, Source Select, eight 136-byte compressor LUTs, three
+phase-compensation gains, Output Headroom Gain, and the 180-byte Soft Clip LUT. Selectors and
+gains are writable byte arrays. LUTs are readable and remain read-only until an atomic
+multi-chunk write protocol exists.
 
-The client identifies a word with `(parameter_id, word_index)`. It reads every index from zero
-through `word_count - 1` to assemble a multiword value. Each word receives its own transaction
-ID and correlated indication; revision must remain stable across the assembled read.
+The client identifies a chunk with `(parameter_id, byte_offset)`. It reads four opaque bytes at
+each offset from zero through `byte_count - 1` to assemble a parameter. Each chunk receives its
+own transaction ID and correlated indication; revision must remain stable across the assembled read.
 
 Normal requests use stable IDs. Control Link validates framing, readiness, size, and queue
-capacity. At the PoC stage, the firmware trusts the workstation's precomputed values and the
-DSP parameter controller performs only the structural bounds checks required for safe access.
+capacity. The DSP parameter controller treats payloads as bytes and performs only access and
+structural bounds checks required for safe access.
 
 MVP constraints:
 
 - one outstanding parameter operation;
-- one DSP word per correlated `GET_PARAMETER` or `SET_PARAMETER` request;
-- the workstation exposes writes for the six fixed scalar controls; all 323 catalog words are
-  mirrored as per-parameter, DSP-order byte arrays in RAM;
+- up to four opaque parameter bytes per correlated `GET_PARAMETER` or `SET_PARAMETER` request;
+- the workstation exposes writes for the six fixed writable byte arrays; all 1,292 catalog bytes
+  are mirrored as per-parameter byte arrays in RAM;
 - each parameter is persisted independently as raw bytes under its own stable-ID Zephyr
-  Settings key; a successful SET saves only the complete parameter that owns the changed word;
+  Settings key; a successful SET saves only the complete parameter that owns the changed bytes;
 - the parameter controller decides when values are loaded and saved, while the DSP parameter
   settings adapter owns the Zephyr Settings keys and copies data without interpreting it;
-- startup copies the generated SigmaStudio defaults into the RAM arrays, then directly overlays
-  any independently stored parameters. Missing or malformed entries leave their defaults in
-  place and are saved independently, then the resulting RAM values are written to codec
+- startup copies the generated SigmaStudio defaults into the RAM arrays when the ADAU1787 is
+  enabled, or uses zero-filled opaque defaults in Bluetooth-only builds, then directly overlays
+  independently stored parameters. Missing or malformed entries leave their defaults in place
+  and are saved independently. ADAU1787 builds then write the resulting RAM bytes to codec
   parameter memory;
 - internal routines that already changed the codec ask the controller to update and save only
   the affected RAM parameter;
 - the protocol revision is boot-local and is not persisted in flash;
-- parameter value constraints are workstation-owned during the trusted PoC;
+- parameter contents have no firmware or workstation interpretation;
 - no BLE raw RAM/register access, batch atomicity, or whole-profile replacement.
 
 Codec parameter I/O goes through Codec Adapter, the common boundary directly above the
-ADAU1787 driver. Its parameter read/write operations are stubs until hardware behavior can be
-validated. Reads are served from the complete synchronized RAM mirror, including LUT words.
-Because remote updates now strictly require codec success before flash and RAM are changed,
-SET requests currently report DSP failure and commit nothing while the write stub returns
-`-ENOTSUP`. The service advertises deferred DSP access until the adapter's live read/write
-operations are implemented and hardware-validated.
+ADAU1787 driver. All calls into that boundary are compiled only when
+`CONFIG_AUDIO_CODEC_ADAU1787` is enabled. Bluetooth-only builds serve reads from RAM and persist
+writes without attempting codec access. In ADAU1787 builds, the adapter's parameter operations
+remain hardware-validation stubs; remote updates require codec success before flash and RAM are
+changed. The service advertises deferred DSP access until live adapter operations are
+implemented and hardware-validated.
 
 A device-provided dynamic catalog and a generator based on the SigmaStudio `.params` export
 are post-MVP improvements. Compatibility negotiation for a dynamic catalog can be designed if
@@ -179,7 +180,7 @@ without vendor source-selection opcodes.
 
 The MVP trusts one workstation and does not require encryption, bonding, or physical presence.
 It still validates structural framing, array bounds, sizes, queue capacity, and transaction IDs
-on-device, but trusts parameter values supplied by the workstation. Production authorization,
+on-device, but treats parameter bytes supplied by the workstation as opaque. Production authorization,
 semantic validation, roles, audit records, and raw-memory maintenance access remain future work.
 
 Audio deadlines take priority over management throughput. Keep buffers fixed, queues
