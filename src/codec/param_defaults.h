@@ -17,13 +17,17 @@
 #include <stdint.h>
 
 /**
- * @brief Parameter-default byte arrays indexed directly by parameter ID.
+ * @brief Get a zero-copy view of a catalog parameter's SigmaStudio default.
  *
- * Index zero is unused. Each remaining entry points into the generated
- * `Param_Data_IC_1_Sigma` byte array at the first word of the corresponding
- * catalog parameter. The byte length is the catalog entry's word count times
- * the four-byte codec parameter-word size.
+ * The returned pointer addresses the parameter's first byte in the generated
+ * `Param_Data_IC_1_Sigma` array. Its byte length is the matching catalog
+ * entry's word count times the four-byte codec parameter-word size.
+ *
+ * @param id Stable parameter ID from the fixed contract.
+ *
+ * @return Pointer to the parameter's generated default bytes, or NULL when
+ * @p id is outside the catalog.
  */
-extern const uint8_t* const dsp_parameter_defaults[DSP_PARAMETER_COUNT + 1U];
+const uint8_t* dsp_parameter_default(uint8_t id);
 
 #endif /* PARAM_DEFAULTS_H */

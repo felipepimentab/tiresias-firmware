@@ -14,19 +14,6 @@
 #define CODEC_PARAMETER_WORD_SIZE 4U
 
 /**
- * @brief Copy bytes from the generated SigmaStudio parameter image.
- *
- * This reads the firmware's immutable default image, not live codec memory.
- *
- * @param start_addr Parameter-memory byte address of the first requested byte.
- * @param[out] data Destination buffer.
- * @param len Number of bytes to copy.
- *
- * @return 0 on success, otherwise a negative errno-style value.
- */
-int codec_param_default_read(uint16_t start_addr, uint8_t* data, size_t len);
-
-/**
  * @brief Read bytes from live codec parameter memory.
  *
  * @return 0 on success, otherwise a negative errno-style value.

@@ -87,7 +87,7 @@ static int load_sigma_defaults(void)
 
   for (size_t parameter_index = 0; parameter_index < DSP_PARAMETER_COUNT; parameter_index++) {
     const struct dsp_parameter* parameter = &dsp_parameter_contract[parameter_index];
-    const uint8_t* defaults = dsp_parameter_defaults[parameter->id];
+    const uint8_t* defaults = dsp_parameter_default(parameter->id);
 
     if (defaults == NULL) {
       return -EINVAL;

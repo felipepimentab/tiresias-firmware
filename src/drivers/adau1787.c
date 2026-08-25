@@ -10,7 +10,6 @@
 #include <errno.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include <string.h>
 #include <zephyr/drivers/gpio.h>
 #include <zephyr/drivers/i2c.h>
 #include <zephyr/kernel.h>
@@ -193,23 +192,6 @@ int adau1787_init(void)
   ERR_CHK_MSG(adau_init_error, "Failed to program ADAU1787 codec");
 
   LOG_INF("Audio codec initialization done.");
-  return 0;
-}
-
-int adau1787_param_default_read(sub_addr_t start_addr, uint8_t* data, size_t len)
-{
-  size_t offset;
-
-  if (data == NULL || len == 0U || start_addr < PARAM_ADDR_IC_1_Sigma) {
-    return -EINVAL;
-  }
-
-  offset = start_addr - PARAM_ADDR_IC_1_Sigma;
-  if (offset + len > PARAM_SIZE_IC_1_Sigma) {
-    return -ERANGE;
-  }
-
-  memcpy(data, &Param_Data_IC_1_Sigma[offset], len);
   return 0;
 }
 
