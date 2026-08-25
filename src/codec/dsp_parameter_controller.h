@@ -9,13 +9,11 @@
  * @brief Runtime lifecycle controller for the fixed DSP parameter contract.
  *
  * The controller keeps the fixed catalog's complete parameter image synchronized
- * in per-parameter RAM arrays and the nRF5340's internal flash. Builds with
- * CONFIG_AUDIO_CODEC_ADAU1787 also synchronize the ADAU1787's parameter memory;
- * builds without it compile out all codec access. RAM and flash retain the
- * opaque bytes unchanged. The controller owns lifecycle ordering and the
- * boot-local, monotonically increasing parameter revision; storage mechanics
- * remain private to dsp_parameter_settings and codec I/O remains private to
- * codec_adapter.
+ * in per-parameter RAM arrays and the nRF5340's internal flash. RAM and flash
+ * retain the opaque bytes unchanged. The controller owns lifecycle ordering and
+ * the boot-local, monotonically increasing parameter revision; storage mechanics
+ * remain private to dsp_parameter_settings. Hardware synchronization is deferred
+ * while BLE communication and flash persistence are validated.
  *
  * Calls that access or mutate parameter state are serialized internally. The
  * module must be initialized before serving parameter requests.
@@ -31,21 +29,15 @@
 /**
  * @brief Initialize the runtime parameter state.
  *
- * In ADAU1787 builds, call this after the codec driver has loaded the generated
- * SigmaStudio image. The controller copies the catalog parameters' SigmaStudio
- * defaults into RAM. Builds without the codec use zero-filled opaque defaults.
- * It then loads each independently stored parameter directly into its matching
- * byte array. Missing settings leave that parameter at its applicable default.
- * ADAU1787 builds write the complete resulting RAM state to the codec before
- * initialization completes.
+ * The controller starts with zero-filled opaque defaults, then loads each
+ * independently stored parameter directly into its matching byte array. Missing
+ * settings leave that parameter zero-filled. This stage performs no hardware I/O.
  *
- * A failed restore leaves the controller unavailable rather than exposing an
- * image that is known not to be synchronized. Repeated successful calls are
- * harmless.
+ * A failed settings restore leaves the controller unavailable. Repeated
+ * successful calls are harmless.
  *
- * @retval 0 RAM and flash are synchronized, as is codec parameter memory when enabled.
- * @return A negative errno-style value when defaults cannot be read, flash
- * cannot be loaded or initialized, or codec restoration fails.
+ * @retval 0 The RAM state was initialized and stored parameters were loaded.
+ * @return A negative errno-style value when flash cannot be loaded or initialized.
  */
 int dsp_parameter_controller_init(void);
 
@@ -72,17 +64,15 @@ int dsp_parameter_controller_init(void);
 int dsp_parameter_controller_get(uint8_t id, uint8_t byte_offset, uint8_t* data, size_t size, uint32_t* revision);
 
 /**
- * @brief Apply remotely supplied opaque bytes to every enabled mirror.
+ * @brief Persist remotely supplied opaque bytes and update the RAM mirror.
  *
- * This is the GATT/external-update path. ADAU1787 builds first write the new
- * byte range to the codec. The controller then saves the owning parameter's
- * complete byte array to its independent flash key and updates RAM. A codec
- * failure leaves flash and RAM unchanged. If persistence fails after a codec
- * write, the controller attempts to restore the codec's previous bytes. Builds
- * without the codec compile out both codec operations.
+ * This is the GATT/external-update path. The controller saves the owning
+ * parameter's complete byte array to its independent flash key, then updates
+ * RAM. A persistence failure leaves RAM unchanged. This stage performs no
+ * hardware I/O.
  *
  * The bytes have no numerical meaning to firmware. Only structural ID and byte
- * bounds required for safe array and DSP access are validated.
+ * bounds required for safe array access are validated.
  *
  * @param[in] id Stable parameter ID from the fixed contract.
  * @param[in] byte_offset Zero-based byte offset within the parameter.
@@ -90,28 +80,26 @@ int dsp_parameter_controller_get(uint8_t id, uint8_t byte_offset, uint8_t* data,
  * @param[in] size Number of bytes to apply.
  * @param[out] revision Destination for the new revision on success.
  *
- * @retval 0 Every enabled mirror contains the new bytes.
+ * @retval 0 Flash and RAM contain the new bytes.
  * @retval -ENOENT @p id is not part of the catalog.
  * @retval -EACCES The catalog does not permit writes to the parameter.
  * @retval -EINVAL @p data or @p revision is NULL.
  * @retval -ERANGE The requested byte range is empty or outside the parameter.
  * @retval -EAGAIN Startup synchronization has not completed.
- * @retval -EREMOTE Codec access failed.
  * @return Another negative errno-style value when persistence fails.
  */
 int dsp_parameter_controller_set(uint8_t id, uint8_t byte_offset, const uint8_t* data, size_t size, uint32_t* revision);
 
 /**
- * @brief Mirror opaque parameter bytes already applied to the codec internally.
+ * @brief Persist an internally supplied update and mirror it in RAM.
  *
- * Internal routines call this after successfully writing the codec. The codec
- * operation remains the caller's responsibility and is expected to use the
- * Codec Adapter. The controller updates the owning RAM parameter and persists
- * only that parameter. It does not write the codec.
+ * This compatibility entry point updates the owning RAM parameter and persists
+ * only that parameter. It performs no hardware I/O. It remains available for
+ * existing internal callers until codec updates are routed through one owner.
  *
  * @param[in] id Stable parameter ID from the fixed contract.
  * @param[in] byte_offset Zero-based byte offset within the parameter.
- * @param[in] data Opaque bytes already present in codec parameter memory.
+ * @param[in] data Opaque bytes to persist and mirror.
  * @param[in] size Number of bytes to mirror.
  * @param[out] revision Destination for the committed revision.
  *
@@ -139,7 +127,7 @@ uint32_t dsp_parameter_controller_revision(void);
 /**
  * @brief Report whether parameter initialization completed successfully.
  *
- * @retval true RAM, flash, and codec parameter memory are synchronized.
+ * @retval true The RAM state was initialized from zero defaults and flash.
  * @retval false Initialization has not completed successfully.
  */
 bool dsp_parameter_controller_loaded(void);

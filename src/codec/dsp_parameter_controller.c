@@ -6,7 +6,6 @@
 
 #include "dsp_parameter_controller.h"
 
-#include "codec_adapter.h"
 #include "dsp_parameter_catalog.h"
 #include "dsp_parameter_settings.h"
 
@@ -84,23 +83,14 @@ static int load_parameter_defaults(void)
 
   for (size_t parameter_index = 0; parameter_index < DSP_PARAMETER_COUNT; parameter_index++) {
     const struct dsp_parameter* parameter = &dsp_parameter_contract[parameter_index];
-#if defined(CONFIG_AUDIO_CODEC_ADAU1787)
-    const uint8_t* defaults = dsp_parameter_default(parameter->id);
-#endif
     size_t size = parameter->byte_count;
 
     if (parameter_data[parameter->id] == NULL) {
       return -EINVAL;
     }
 
-#if defined(CONFIG_AUDIO_CODEC_ADAU1787)
-    if (defaults == NULL) {
-      return -EINVAL;
-    }
-    memcpy(parameter_data[parameter->id], defaults, size);
-#else
+    /* TODO: Load generated defaults through Codec Adapter when hardware integration resumes. */
     memset(parameter_data[parameter->id], 0, size);
-#endif
     byte_count += size;
   }
 
@@ -109,42 +99,6 @@ static int load_parameter_defaults(void)
   }
 
   atomic_clear(&current_revision);
-  return 0;
-}
-
-static int write_codec_bytes(
-    const struct dsp_parameter* parameter, uint8_t byte_offset, const uint8_t* data, size_t size)
-{
-#if defined(CONFIG_AUDIO_CODEC_ADAU1787)
-  int ret;
-
-  ret = codec_param_write(dsp_parameter_addresses[parameter->id] + byte_offset, data, size);
-
-  return ret == 0 ? 0 : -EREMOTE;
-#else
-  ARG_UNUSED(parameter);
-  ARG_UNUSED(byte_offset);
-  ARG_UNUSED(data);
-  ARG_UNUSED(size);
-
-  return 0;
-#endif
-}
-
-static int write_all_codec_values(void)
-{
-  int ret;
-
-  for (size_t parameter_index = 0; parameter_index < DSP_PARAMETER_COUNT; parameter_index++) {
-    const struct dsp_parameter* parameter = &dsp_parameter_contract[parameter_index];
-
-    ret = write_codec_bytes(parameter, 0U, parameter_data[parameter->id], parameter->byte_count);
-    if (ret != 0) {
-      LOG_ERR("Failed to restore DSP parameter %u", parameter->id);
-      return ret;
-    }
-  }
-
   return 0;
 }
 
@@ -188,15 +142,12 @@ int dsp_parameter_controller_init(void)
     goto out;
   }
 
-  ret = dsp_parameter_settings_load(parameter_data, IS_ENABLED(CONFIG_AUDIO_CODEC_ADAU1787));
+  ret = dsp_parameter_settings_load(parameter_data, false);
   if (ret != 0) {
     goto out;
   }
 
-  ret = write_all_codec_values();
-  if (ret != 0) {
-    goto out;
-  }
+  /* TODO: Restore the complete parameter state through Codec Adapter when hardware integration resumes. */
 
   atomic_set(&parameters_initialized, 1);
 
@@ -233,7 +184,6 @@ int dsp_parameter_controller_get(uint8_t id, uint8_t byte_offset, uint8_t* data,
 int dsp_parameter_controller_set(uint8_t id, uint8_t byte_offset, const uint8_t* data, size_t size, uint32_t* revision)
 {
   const struct dsp_parameter* parameter = dsp_parameter_definition(id);
-  int rollback_ret;
   int ret;
 
   if (data == NULL || revision == NULL) {
@@ -260,19 +210,10 @@ int dsp_parameter_controller_set(uint8_t id, uint8_t byte_offset, const uint8_t*
     return 0;
   }
 
-  ret = write_codec_bytes(parameter, byte_offset, data, size);
-  if (ret != 0) {
-    LOG_ERR("Failed to write DSP parameter %u bytes %u..%zu", id, byte_offset, byte_offset + size - 1U);
-    k_mutex_unlock(&parameter_mutex);
-    return ret;
-  }
+  /* TODO: Apply the update through Codec Adapter before committing it to flash and RAM. */
 
   ret = persist_bytes(parameter, byte_offset, data, size, revision);
   if (ret != 0) {
-    rollback_ret = write_codec_bytes(parameter, byte_offset, parameter_bytes(parameter, byte_offset), size);
-    if (rollback_ret != 0) {
-      LOG_ERR("Failed to roll back DSP parameter %u bytes %u..%zu", id, byte_offset, byte_offset + size - 1U);
-    }
     LOG_ERR("Failed to persist DSP parameter %u bytes %u..%zu: %d", id, byte_offset, byte_offset + size - 1U, ret);
   }
 
@@ -299,6 +240,7 @@ int dsp_parameter_controller_mirror_codec_update(
     return -EAGAIN;
   }
 
+  /* TODO: Remove this compatibility path when the controller owns internal codec updates. */
   k_mutex_lock(&parameter_mutex, K_FOREVER);
 
   if (memcmp(parameter_bytes(parameter, byte_offset), data, size) == 0) {
