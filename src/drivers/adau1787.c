@@ -26,8 +26,8 @@ BUILD_ASSERT(PARAM_ADDR_IC_1_Sigma == ADAU1787_PARAM_RAM_BASE, "Param Memory Add
 /** @brief Device Tree Specification for ADAU1787 */
 #define ADAU1787_NODE DT_NODELABEL(adau_1787)
 
-BUILD_ASSERT(DT_NODE_HAS_STATUS(ADAU1787_NODE, okay),
-    "CONFIG_AUDIO_CODEC_ADAU1787 requires an enabled adau_1787 devicetree node");
+BUILD_ASSERT(
+    DT_NODE_HAS_STATUS(ADAU1787_NODE, okay), "The ADAU1787 driver requires an enabled adau_1787 devicetree node");
 BUILD_ASSERT(DT_ON_BUS(ADAU1787_NODE, i2c), "The adau_1787 devicetree node must be on an I2C bus");
 BUILD_ASSERT(
     DT_NODE_HAS_PROP(ADAU1787_NODE, powerdown_gpios), "The adau_1787 devicetree node requires powerdown-gpios");

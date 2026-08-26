@@ -49,7 +49,4 @@ add_subdirectory(src/codec)
 add_subdirectory(src/drivers)
 add_subdirectory(src/modules)
 add_subdirectory(src/utils)
-
-if(CONFIG_AUDIO_CODEC_ADAU1787)
-    add_subdirectory(src/SigmaStudioFiles)
-endif()
+add_subdirectory(src/SigmaStudioFiles)
