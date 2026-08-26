@@ -6,22 +6,22 @@
 
 /**
  * @file
- * @brief Zephyr Settings adapter for individual DSP parameters.
+ * @brief Zephyr Settings adapter for individual codec parameters.
  *
  * The adapter maps a stable parameter ID to the key
  * `tiresias/parameters/<id>` and delegates storage to Zephyr Settings. Each key
  * contains one complete opaque parameter value. The module does not know the
- * DSP catalog, own RAM values, interpret bytes, manage revisions, or access
+ * codec contract, own RAM values, interpret bytes, manage revisions, or access
  * codec hardware.
  *
- * The parameter controller is the only intended caller and is responsible for
- * supplying a valid ID, buffer, and catalog byte count. The current
- * proof-of-concept intentionally defers catalog validation and stored-length
+ * Codec Parameters is the only intended caller and is responsible for supplying
+ * a valid ID, buffer, and contract byte count. The current
+ * proof-of-concept intentionally defers contract validation and stored-length
  * recovery to keep this adapter small.
  */
 
-#ifndef DSP_PARAMETER_SETTINGS_H
-#define DSP_PARAMETER_SETTINGS_H
+#ifndef CODEC_SETTINGS_H
+#define CODEC_SETTINGS_H
 
 #include <stddef.h>
 #include <stdint.h>
@@ -35,7 +35,7 @@
  * @retval 0 The Settings subsystem is ready.
  * @return A negative errno-style value from Zephyr Settings initialization.
  */
-int dsp_parameter_settings_init(void);
+int codec_settings_init(void);
 
 /**
  * @brief Load one parameter value from flash.
@@ -51,7 +51,7 @@ int dsp_parameter_settings_init(void);
  * @retval 0 The stored value was read or the key does not exist.
  * @return A negative errno-style value from Zephyr Settings.
  */
-int dsp_parameter_settings_load(uint8_t id, uint8_t* data, size_t size);
+int codec_settings_load(uint8_t id, uint8_t* data, size_t size);
 
 /**
  * @brief Save one complete parameter value to flash.
@@ -63,6 +63,6 @@ int dsp_parameter_settings_load(uint8_t id, uint8_t* data, size_t size);
  * @retval 0 The value was accepted by the Settings backend.
  * @return A negative errno-style value from Zephyr Settings.
  */
-int dsp_parameter_settings_save(uint8_t id, const uint8_t* data, size_t size);
+int codec_settings_save(uint8_t id, const uint8_t* data, size_t size);
 
-#endif /* DSP_PARAMETER_SETTINGS_H */
+#endif /* CODEC_SETTINGS_H */

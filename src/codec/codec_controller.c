@@ -6,7 +6,7 @@
 
 #include "codec_controller.h"
 
-#include "dsp_parameter_controller.h"
+#include "codec_parameters.h"
 
 #if defined(CONFIG_AUDIO_CODEC_ADAU1787)
 #include "hw_codec.h"
@@ -185,7 +185,7 @@ static void handle_state_off(const struct zbus_channel* channel)
   LOG_INF("Hardware codec disabled for Bluetooth-only testing");
 #endif
 
-  ret = dsp_parameter_controller_init();
+  ret = codec_parameters_init();
   if (ret != 0) {
     LOG_ERR("Failed to initialize DSP parameters: %d", ret);
     enter_error();

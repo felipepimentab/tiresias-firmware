@@ -101,7 +101,7 @@ each offset from zero through `byte_count - 1` to assemble a parameter. Each chu
 own transaction ID and correlated indication; revision must remain stable across the assembled read.
 
 Normal requests use stable IDs. Control Link validates framing, readiness, size, and queue
-capacity. The DSP parameter controller treats payloads as bytes and performs only access and
+capacity. Codec Parameters treats payloads as bytes and performs only access and
 structural bounds checks required for safe access.
 
 MVP constraints:
@@ -112,8 +112,8 @@ MVP constraints:
   are stored in one packed RAM image;
 - each parameter is persisted independently as raw bytes under its own stable-ID Zephyr
   Settings key; a successful SET saves only the complete parameter that owns the changed bytes;
-- the parameter controller decides when values are loaded and saved, while the DSP parameter
-  settings adapter owns the Zephyr Settings keys and copies data without interpreting it;
+- Codec Parameters decides when values are loaded and saved, while Codec Settings owns the
+  Zephyr Settings keys and copies data without interpreting it;
 - startup zero-fills the RAM image and overlays independently stored parameters. Missing entries
   remain zero-filled;
 - the protocol revision is boot-local and is not persisted in flash;
@@ -146,7 +146,7 @@ partial-application semantics.
 | ADAU1787 validation and access | Codec Controller |
 
 `bt_mgmt_init()` is mutex-protected and caches the first result for the boot; either Control
-Link or Audio Streaming may call first. The parameter controller initializes the idempotent
+Link or Audio Streaming may call first. Codec Parameters initializes the idempotent
 Zephyr Settings backend and loads individual DSP settings directly. The current build assigns
 advertising set 0 only to Control Link. New advertising clients require an allocator/composer
 and updated controller limits.

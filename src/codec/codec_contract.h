@@ -6,9 +6,9 @@
 
 /**
  * @file
- * @brief Fixed public DSP parameter contract.
+ * @brief Fixed public codec parameter contract.
  *
- * The catalog is the authoritative description of the DSP parameters exposed
+ * This module is the authoritative description of the DSP parameters exposed
  * by the MVP BLE contract. It assigns stable block and parameter IDs, describes
  * the public byte count and access flags of each parameter, and provides lookup
  * by stable parameter ID.
@@ -19,17 +19,17 @@
  * contract rather than transmitted by the firmware.
  *
  * IDs are dense, start at one, and match the order of
- * @ref dsp_parameter_contract. The ordered four-byte definitions form the
+ * @ref codec_contract. The ordered four-byte definitions form the
  * public contract fingerprint. Any contract change must also update
- * @ref DSP_PARAMETER_COUNT, @ref DSP_PARAMETER_BYTE_COUNT,
- * @ref DSP_PARAMETER_CONTRACT_CRC32, and the workstation contract.
+ * @ref CODEC_PARAMETER_COUNT, @ref CODEC_PARAMETER_BYTE_COUNT,
+ * @ref CODEC_CONTRACT_CRC32, and the workstation contract.
  *
  * This module owns immutable metadata only. It does not own runtime values,
  * persistence, BLE request handling, or codec access.
  */
 
-#ifndef DSP_PARAMETER_CATALOG_H
-#define DSP_PARAMETER_CATALOG_H
+#ifndef CODEC_CONTRACT_H
+#define CODEC_CONTRACT_H
 
 #include "adau1787.h"
 #include <stdint.h>
@@ -38,34 +38,34 @@
  * @brief CRC-32 fingerprint of the ordered public parameter contract.
  *
  * The fingerprint is calculated over the raw bytes of
- * @ref dsp_parameter_contract and is used to detect firmware/workstation
+ * @ref codec_contract and is used to detect firmware/workstation
  * contract mismatches.
  */
-#define DSP_PARAMETER_CONTRACT_CRC32 0x22045C5CU
+#define CODEC_CONTRACT_CRC32 0x22045C5CU
 
-/** Number of entries in @ref dsp_parameter_contract. */
-#define DSP_PARAMETER_COUNT 15U
+/** Number of entries in @ref codec_contract. */
+#define CODEC_PARAMETER_COUNT 15U
 
 /** Number of opaque bytes from number of DSP parameter words */
-#define BYTES_FROM_WORDS(words) ((uint8_t)(words) * ADAU1787_PARAM_RAM_WIDTH_BYTES)
+#define CODEC_BYTES_FROM_WORDS(words) ((uint8_t)(words) * ADAU1787_PARAM_RAM_WIDTH_BYTES)
 
 /**
  * @brief Total number of parameter-value bytes in the fixed contract.
  *
- * The controller uses this value to allocate its packed RAM image. It must
- * equal the sum of every @ref dsp_parameter.byte_count entry.
+ * Codec Parameters uses this value to allocate its packed RAM image. It must
+ * equal the sum of every @ref codec_parameter.byte_count entry.
  */
-#define DSP_PARAMETER_BYTE_COUNT (2U * 4U + 8U * 136U + 4U * 4U + 180U)
+#define CODEC_PARAMETER_BYTE_COUNT (2U * 4U + 8U * 136U + 4U * 4U + 180U)
 
 /**
  * @brief Public parameter access flags.
  *
- * Flags occupy one byte in @ref dsp_parameter. They describe access only and
+ * Flags occupy one byte in @ref codec_parameter. They describe access only and
  * never assign a representation to the opaque parameter bytes.
  */
-enum dsp_parameter_contract_flag {
+enum codec_contract_flag {
   /** The parameter accepts write requests; all parameters remain readable. */
-  DSP_PARAMETER_CONTRACT_FLAG_WRITABLE = 1U << 0
+  CODEC_CONTRACT_FLAG_WRITABLE = 1U << 0
 };
 
 /**
@@ -153,7 +153,7 @@ enum dsp_parameter_id {
  * used to calculate the fixed contract fingerprint. It deliberately excludes
  * names, prescription constraints, and DSP addresses.
  */
-struct dsp_parameter {
+struct codec_parameter {
   /** Stable @ref dsp_parameter_id value. */
   uint8_t id;
 
@@ -163,7 +163,7 @@ struct dsp_parameter {
   /** Number of consecutive opaque bytes in the parameter. */
   uint8_t byte_count;
 
-  /** Bitwise combination of @ref dsp_parameter_contract_flag values. */
+  /** Bitwise combination of @ref codec_contract_flag values. */
   uint8_t flags;
 };
 
@@ -171,25 +171,25 @@ struct dsp_parameter {
  * @brief Ordered public parameter contract.
  *
  * Entries are ordered by ID, so a validated nonzero ID maps to array index
- * `id - 1`. The controller also concatenates parameter values in this order in
- * its packed RAM image.
+ * `id - 1`. Codec Parameters also concatenates values in this order in its
+ * packed RAM image.
  *
  * The entry order and contents participate in
- * @ref DSP_PARAMETER_CONTRACT_CRC32. Any contract change must be mirrored in
+ * @ref CODEC_CONTRACT_CRC32. Any contract change must be mirrored in
  * `tiresias_workstation.domain.dsp_contract` and reflected in the contract
  * CRC.
  */
-extern const struct dsp_parameter dsp_parameter_contract[DSP_PARAMETER_COUNT];
+extern const struct codec_parameter codec_contract[CODEC_PARAMETER_COUNT];
 
 /**
  * @brief Find a parameter definition by stable ID.
  *
  * @param id Stable parameter ID from the fixed contract.
  *
- * @return Pointer to the immutable catalog entry, or NULL when @p id is not in
- * the catalog. The returned pointer remains valid for the lifetime of the
+ * @return Pointer to the immutable contract entry, or NULL when @p id is not in
+ * the contract. The returned pointer remains valid for the lifetime of the
  * firmware.
  */
-const struct dsp_parameter* dsp_parameter_definition(uint8_t id);
+const struct codec_parameter* codec_contract_find(uint8_t id);
 
-#endif /* DSP_PARAMETER_CATALOG_H */
+#endif /* CODEC_CONTRACT_H */

@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: LicenseRef-Nordic-5-Clause
  */
 
-#include "dsp_parameter_settings.h"
+#include "codec_settings.h"
 
 #include <stdio.h>
 #include <zephyr/settings/settings.h>
@@ -17,12 +17,12 @@ static void parameter_key(uint8_t id, char key[SETTINGS_KEY_SIZE])
   (void)snprintf(key, SETTINGS_KEY_SIZE, SETTINGS_SUBTREE "/%u", id);
 }
 
-int dsp_parameter_settings_init(void)
+int codec_settings_init(void)
 {
   return settings_subsys_init();
 }
 
-int dsp_parameter_settings_load(uint8_t id, uint8_t* data, size_t size)
+int codec_settings_load(uint8_t id, uint8_t* data, size_t size)
 {
   char key[SETTINGS_KEY_SIZE];
   ssize_t bytes_read;
@@ -37,7 +37,7 @@ int dsp_parameter_settings_load(uint8_t id, uint8_t* data, size_t size)
   return 0;
 }
 
-int dsp_parameter_settings_save(uint8_t id, const uint8_t* data, size_t size)
+int codec_settings_save(uint8_t id, const uint8_t* data, size_t size)
 {
   char key[SETTINGS_KEY_SIZE];
 

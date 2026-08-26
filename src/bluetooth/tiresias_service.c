@@ -6,8 +6,8 @@
 
 #include "tiresias_service.h"
 
-#include "dsp_parameter_catalog.h"
-#include "dsp_parameter_controller.h"
+#include "codec_contract.h"
+#include "codec_parameters.h"
 
 #include <errno.h>
 #include <string.h>
@@ -79,16 +79,16 @@ static void encode_protocol_info(uint8_t data[TIRESIAS_PROTOCOL_INFO_SIZE])
   sys_put_le32(TIRESIAS_CAPABILITIES, &data[4]);
   sys_put_le16(TIRESIAS_REQUEST_SIZE, &data[8]);
   sys_put_le16(TIRESIAS_RESPONSE_SIZE, &data[10]);
-  sys_put_le32(DSP_PARAMETER_CONTRACT_CRC32, &data[12]);
+  sys_put_le32(CODEC_CONTRACT_CRC32, &data[12]);
   sys_put_le32(boot_id, &data[16]);
-  sys_put_le32(dsp_parameter_controller_revision(), &data[20]);
+  sys_put_le32(codec_parameters_revision(), &data[20]);
 }
 
 static int encode_status(uint8_t data[TIRESIAS_STATUS_SIZE])
 {
   uint8_t flags = TIRESIAS_DSP_STATUS_FLAGS;
 
-  if (dsp_parameter_controller_loaded()) {
+  if (codec_parameters_loaded()) {
     flags |= TIRESIAS_STATUS_PARAMETERS_LOADED;
   }
 
@@ -281,9 +281,9 @@ static void send_status_notification(struct bt_conn* conn)
 static void process_request(const struct tiresias_request* request)
 {
   struct bt_conn* conn;
-  const struct dsp_parameter* parameter = NULL;
+  const struct codec_parameter* parameter = NULL;
   uint8_t data[TIRESIAS_PARAMETER_CHUNK_SIZE] = { 0 };
-  uint32_t revision = dsp_parameter_controller_revision();
+  uint32_t revision = codec_parameters_revision();
   bool setting = request->opcode == TIRESIAS_OPCODE_SET_PARAMETER;
   enum tiresias_result result;
   size_t size = 1U;
@@ -294,15 +294,15 @@ static void process_request(const struct tiresias_request* request)
     return;
   }
 
-  parameter = dsp_parameter_definition(request->parameter_id);
+  parameter = codec_contract_find(request->parameter_id);
   if (parameter != NULL && request->byte_offset < parameter->byte_count) {
     size = MIN(sizeof(data), parameter->byte_count - request->byte_offset);
   }
 
   if (setting) {
-    ret = dsp_parameter_controller_set(request->parameter_id, request->byte_offset, request->data, size, &revision);
+    ret = codec_parameters_set(request->parameter_id, request->byte_offset, request->data, size, &revision);
   } else {
-    ret = dsp_parameter_controller_get(request->parameter_id, request->byte_offset, data, size, &revision);
+    ret = codec_parameters_get(request->parameter_id, request->byte_offset, data, size, &revision);
   }
   result = map_result(ret, setting);
 
@@ -380,8 +380,8 @@ int tiresias_service_init(void)
     return 0;
   }
 
-  contract_crc = crc32_ieee((const uint8_t*)dsp_parameter_contract, sizeof(dsp_parameter_contract));
-  if (contract_crc != DSP_PARAMETER_CONTRACT_CRC32) {
+  contract_crc = crc32_ieee((const uint8_t*)codec_contract, sizeof(codec_contract));
+  if (contract_crc != CODEC_CONTRACT_CRC32) {
     LOG_ERR("DSP contract CRC mismatch: 0x%08x", contract_crc);
     return -EINVAL;
   }
@@ -425,7 +425,7 @@ void tiresias_service_set_control_state(control_link_state state)
 
   k_mutex_lock(&service_mutex, K_FOREVER);
   atomic_set(&control_state, state);
-  status_revision = dsp_parameter_controller_revision();
+  status_revision = codec_parameters_revision();
   k_mutex_unlock(&service_mutex);
 
   conn = get_control_connection();

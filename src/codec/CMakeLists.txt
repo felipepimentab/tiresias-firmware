@@ -7,9 +7,9 @@
 target_sources(app PRIVATE
                ${CMAKE_CURRENT_SOURCE_DIR}/codec_controller.c
                ${CMAKE_CURRENT_SOURCE_DIR}/codec_controller_actions.c
-               ${CMAKE_CURRENT_SOURCE_DIR}/dsp_parameter_catalog.c
-               ${CMAKE_CURRENT_SOURCE_DIR}/dsp_parameter_controller.c
-               ${CMAKE_CURRENT_SOURCE_DIR}/dsp_parameter_settings.c
+               ${CMAKE_CURRENT_SOURCE_DIR}/codec_contract.c
+               ${CMAKE_CURRENT_SOURCE_DIR}/codec_parameters.c
+               ${CMAKE_CURRENT_SOURCE_DIR}/codec_settings.c
 )
 
 target_sources_ifdef(CONFIG_AUDIO_CODEC_ADAU1787 app PRIVATE

@@ -25,7 +25,7 @@ streaming begins; codec programming therefore precedes regular BCLK/LRCK frames.
 4. The driver asserts `!PD`, configures MP3-MP6 low, releases `!PD`, and waits 100 ms.
 5. The generated SigmaDSP sequence runs, including its 35 ms delay.
 6. The generated FastDSP sequence stops and starts FastDSP.
-7. DSP Parameter Controller loads the generated defaults into its RAM mirror and checks
+7. Codec Parameters loads the generated defaults into its RAM mirror and checks
    flash. A valid non-default flash image is restored to codec parameter memory; absent or
    invalid storage is initialized from the defaults already loaded into the codec.
 8. Codec Controller enters `LOCAL_ONLY` and mirrors Source Select to flash and RAM if needed.
@@ -69,7 +69,7 @@ The delay payload `{0x00, 0x23}` is decoded big-endian as 35 ms. FastDSP then re
 `0x00` followed by `0x01` at `FDSP_RUN` (`0xC061`). Exact generated values are not stable;
 the current export is authoritative.
 
-The parameter controller reads its startup defaults directly from the generated parameter
+Codec Parameters reads its startup defaults directly from the generated parameter
 image. This avoids maintaining a second hand-written default table. Replacing the SigmaStudio
 export therefore updates both the codec's initial image and the values used to decide whether
 the persistent image must be restored.
@@ -111,4 +111,4 @@ Troubleshoot in this order:
 Replace `src/SigmaStudioFiles/` as one export and follow the
 [pristine-build workflow](../development/workflow.md). Put wiring in devicetree, driver
 timing/error behavior in `adau1787.c`, adapter behavior in `SigmaStudioFW.h`, and lifecycle
-ordering in Codec Controller and DSP Parameter Controller.
+ordering in Codec Controller and Codec Parameters.

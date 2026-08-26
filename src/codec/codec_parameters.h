@@ -6,26 +6,26 @@
 
 /**
  * @file
- * @brief RAM and flash controller for the fixed DSP parameter contract.
+ * @brief Mutable parameter state for the fixed codec contract.
  *
- * The controller owns the mutable state of every catalog parameter. Values are
- * concatenated in contract order in one @ref DSP_PARAMETER_BYTE_COUNT-byte RAM
+ * This module owns the mutable state of every contract parameter. Values are
+ * concatenated in contract order in one @ref CODEC_PARAMETER_BYTE_COUNT-byte RAM
  * image. The module validates public IDs, access flags, and byte ranges, and
  * serializes initialization, reads, and writes with one mutex.
  *
  * Initialization zero-fills the RAM image and overlays independently persisted
- * values through dsp_parameter_settings. A successful change saves the complete
+ * values through codec_settings. A successful change saves the complete
  * owning parameter before updating RAM. The boot-local revision advances once
  * for each successfully persisted change and does not advance for failed or
  * no-op writes.
  *
  * This proof-of-concept module performs no codec hardware access. Contract
- * metadata belongs to dsp_parameter_catalog and Zephyr Settings mechanics belong
- * to dsp_parameter_settings.
+ * metadata belongs to codec_contract and Zephyr Settings mechanics belong to
+ * codec_settings.
  */
 
-#ifndef DSP_PARAMETER_CONTROLLER_H
-#define DSP_PARAMETER_CONTROLLER_H
+#ifndef CODEC_PARAMETERS_H
+#define CODEC_PARAMETERS_H
 
 #include <stdbool.h>
 #include <stddef.h>
@@ -39,20 +39,20 @@
  * missing key leaves that parameter zero-filled. The revision is reset to zero
  * for the current boot.
  *
- * Successful repeated calls have no effect. A failed call leaves the controller
+ * Successful repeated calls have no effect. A failed call leaves the module
  * unavailable; a later call retries initialization from a newly zero-filled
  * image.
  *
  * @retval 0 Initialization completed or had already completed.
  * @return A negative errno-style value from settings initialization or loading.
  */
-int dsp_parameter_controller_init(void);
+int codec_parameters_init(void);
 
 /**
  * @brief Read an opaque byte range from the RAM image.
  *
  * Reads never access flash or codec hardware. The bytes and revision are copied
- * while the controller mutex is held, so they describe the same committed RAM
+ * while the module mutex is held, so they describe the same committed RAM
  * state.
  *
  * @param id Stable parameter ID from the fixed contract.
@@ -66,9 +66,9 @@ int dsp_parameter_controller_init(void);
  * @retval -ENOENT The parameter ID is unknown.
  * @retval -EINVAL An output pointer is NULL.
  * @retval -ERANGE The requested range is invalid.
- * @retval -EAGAIN The controller is not initialized.
+ * @retval -EAGAIN The module is not initialized.
  */
-int dsp_parameter_controller_get(uint8_t id, uint8_t byte_offset, uint8_t* data, size_t size, uint32_t* revision);
+int codec_parameters_get(uint8_t id, uint8_t byte_offset, uint8_t* data, size_t size, uint32_t* revision);
 
 /**
  * @brief Persist an opaque byte range and update the RAM image.
@@ -95,10 +95,10 @@ int dsp_parameter_controller_get(uint8_t id, uint8_t byte_offset, uint8_t* data,
  * @retval -EACCES The parameter is read-only.
  * @retval -EINVAL An input or output pointer is NULL.
  * @retval -ERANGE The requested range is invalid.
- * @retval -EAGAIN The controller is not initialized.
+ * @retval -EAGAIN The module is not initialized.
  * @return Another negative errno-style value from flash persistence.
  */
-int dsp_parameter_controller_set(uint8_t id, uint8_t byte_offset, const uint8_t* data, size_t size, uint32_t* revision);
+int codec_parameters_set(uint8_t id, uint8_t byte_offset, const uint8_t* data, size_t size, uint32_t* revision);
 
 /**
  * @brief Return the boot-local revision of the committed RAM image.
@@ -108,7 +108,7 @@ int dsp_parameter_controller_set(uint8_t id, uint8_t byte_offset, const uint8_t*
  *
  * @return Current boot-local revision.
  */
-uint32_t dsp_parameter_controller_revision(void);
+uint32_t codec_parameters_revision(void);
 
 /**
  * @brief Report whether initialization from flash completed successfully.
@@ -119,6 +119,6 @@ uint32_t dsp_parameter_controller_revision(void);
  * @retval true The RAM image is available for parameter requests.
  * @retval false Initialization has not completed successfully.
  */
-bool dsp_parameter_controller_loaded(void);
+bool codec_parameters_loaded(void);
 
-#endif /* DSP_PARAMETER_CONTROLLER_H */
+#endif /* CODEC_PARAMETERS_H */

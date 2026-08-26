@@ -4,10 +4,10 @@
  * SPDX-License-Identifier: LicenseRef-Nordic-5-Clause
  */
 
-#include "dsp_parameter_controller.h"
+#include "codec_parameters.h"
 
-#include "dsp_parameter_catalog.h"
-#include "dsp_parameter_settings.h"
+#include "codec_contract.h"
+#include "codec_settings.h"
 
 #include <errno.h>
 #include <string.h>
@@ -15,33 +15,33 @@
 #include <zephyr/sys/atomic.h>
 
 static K_MUTEX_DEFINE(parameter_mutex);
-static uint8_t parameter_data[DSP_PARAMETER_BYTE_COUNT];
+static uint8_t parameter_data[CODEC_PARAMETER_BYTE_COUNT];
 static atomic_t current_revision;
 static atomic_t parameters_initialized;
 
-static size_t parameter_offset(const struct dsp_parameter* parameter)
+static size_t parameter_offset(const struct codec_parameter* parameter)
 {
   size_t offset = 0U;
 
   for (size_t index = 0U; index < parameter->id - 1U; index++) {
-    offset += dsp_parameter_contract[index].byte_count;
+    offset += codec_contract[index].byte_count;
   }
 
   return offset;
 }
 
-static uint8_t* parameter_bytes(const struct dsp_parameter* parameter, uint8_t byte_offset)
+static uint8_t* parameter_bytes(const struct codec_parameter* parameter, uint8_t byte_offset)
 {
   return &parameter_data[parameter_offset(parameter) + byte_offset];
 }
 
-static bool parameter_range_valid(const struct dsp_parameter* parameter, uint8_t byte_offset, size_t size)
+static bool parameter_range_valid(const struct codec_parameter* parameter, uint8_t byte_offset, size_t size)
 {
   return size > 0U && byte_offset < parameter->byte_count && size <= parameter->byte_count - byte_offset;
 }
 
 static int persist_parameter(
-    const struct dsp_parameter* parameter, uint8_t byte_offset, const uint8_t* data, size_t size, uint32_t* revision)
+    const struct codec_parameter* parameter, uint8_t byte_offset, const uint8_t* data, size_t size, uint32_t* revision)
 {
   uint8_t pending_parameter[parameter->byte_count];
   uint32_t pending_revision = (uint32_t)atomic_get(&current_revision) + 1U;
@@ -51,7 +51,7 @@ static int persist_parameter(
   memcpy(pending_parameter, stored_parameter, parameter->byte_count);
   memcpy(&pending_parameter[byte_offset], data, size);
 
-  ret = dsp_parameter_settings_save(parameter->id, pending_parameter, parameter->byte_count);
+  ret = codec_settings_save(parameter->id, pending_parameter, parameter->byte_count);
   if (ret != 0) {
     return ret;
   }
@@ -62,7 +62,7 @@ static int persist_parameter(
   return 0;
 }
 
-int dsp_parameter_controller_init(void)
+int codec_parameters_init(void)
 {
   int ret = 0;
 
@@ -75,7 +75,7 @@ int dsp_parameter_controller_init(void)
     goto out;
   }
 
-  ret = dsp_parameter_settings_init();
+  ret = codec_settings_init();
   if (ret != 0) {
     goto out;
   }
@@ -83,10 +83,10 @@ int dsp_parameter_controller_init(void)
   memset(parameter_data, 0, sizeof(parameter_data));
   atomic_clear(&current_revision);
 
-  for (size_t index = 0U; index < DSP_PARAMETER_COUNT; index++) {
-    const struct dsp_parameter* parameter = &dsp_parameter_contract[index];
+  for (size_t index = 0U; index < CODEC_PARAMETER_COUNT; index++) {
+    const struct codec_parameter* parameter = &codec_contract[index];
 
-    ret = dsp_parameter_settings_load(parameter->id, parameter_bytes(parameter, 0U), parameter->byte_count);
+    ret = codec_settings_load(parameter->id, parameter_bytes(parameter, 0U), parameter->byte_count);
     if (ret != 0) {
       goto out;
     }
@@ -100,9 +100,9 @@ out:
   return ret;
 }
 
-int dsp_parameter_controller_get(uint8_t id, uint8_t byte_offset, uint8_t* data, size_t size, uint32_t* revision)
+int codec_parameters_get(uint8_t id, uint8_t byte_offset, uint8_t* data, size_t size, uint32_t* revision)
 {
-  const struct dsp_parameter* parameter = dsp_parameter_definition(id);
+  const struct codec_parameter* parameter = codec_contract_find(id);
 
   if (parameter == NULL) {
     return -ENOENT;
@@ -124,9 +124,9 @@ int dsp_parameter_controller_get(uint8_t id, uint8_t byte_offset, uint8_t* data,
   return 0;
 }
 
-int dsp_parameter_controller_set(uint8_t id, uint8_t byte_offset, const uint8_t* data, size_t size, uint32_t* revision)
+int codec_parameters_set(uint8_t id, uint8_t byte_offset, const uint8_t* data, size_t size, uint32_t* revision)
 {
-  const struct dsp_parameter* parameter = dsp_parameter_definition(id);
+  const struct codec_parameter* parameter = codec_contract_find(id);
   int ret;
 
   if (parameter == NULL) {
@@ -135,7 +135,7 @@ int dsp_parameter_controller_set(uint8_t id, uint8_t byte_offset, const uint8_t*
   if (data == NULL || revision == NULL) {
     return -EINVAL;
   }
-  if ((parameter->flags & DSP_PARAMETER_CONTRACT_FLAG_WRITABLE) == 0U) {
+  if ((parameter->flags & CODEC_CONTRACT_FLAG_WRITABLE) == 0U) {
     return -EACCES;
   }
   if (!parameter_range_valid(parameter, byte_offset, size)) {
@@ -160,12 +160,12 @@ out:
   return ret;
 }
 
-uint32_t dsp_parameter_controller_revision(void)
+uint32_t codec_parameters_revision(void)
 {
   return (uint32_t)atomic_get(&current_revision);
 }
 
-bool dsp_parameter_controller_loaded(void)
+bool codec_parameters_loaded(void)
 {
   return atomic_get(&parameters_initialized) != 0;
 }
