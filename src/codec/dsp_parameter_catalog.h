@@ -31,6 +31,7 @@
 #ifndef DSP_PARAMETER_CATALOG_H
 #define DSP_PARAMETER_CATALOG_H
 
+#include "adau1787.h"
 #include <stdint.h>
 
 /**
@@ -44,6 +45,9 @@
 
 /** Number of entries in @ref dsp_parameter_contract. */
 #define DSP_PARAMETER_COUNT 15U
+
+/** Number of opaque bytes from number of DSP parameter words */
+#define BYTES_FROM_WORDS(words) ((uint8_t)(words) * ADAU1787_PARAM_RAM_WIDTH_BYTES)
 
 /**
  * @brief Total number of parameter-value bytes in the fixed contract.
