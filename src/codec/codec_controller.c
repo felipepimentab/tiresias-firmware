@@ -6,7 +6,6 @@
 
 #include "codec_controller.h"
 
-#include "dsp_parameter_catalog.h"
 #include "dsp_parameter_controller.h"
 
 #if defined(CONFIG_AUDIO_CODEC_ADAU1787)
@@ -44,11 +43,6 @@ ZBUS_CHAN_DEFINE(codec_controller_result_chan, codec_controller_result_chan_msg,
 ZBUS_CHAN_ADD_OBS(audio_streaming_state_chan, codec_controller_sub, CODEC_CONTROLLER_OBSERVER_PRIORITY);
 
 static codec_controller_state current_state = CODEC_CONTROLLER_STATE_OFF;
-
-#if defined(CONFIG_AUDIO_CODEC_ADAU1787)
-static const uint8_t source_select_i2s_data[] = { 0x00, 0x00, 0x00, 0x00 };
-static const uint8_t source_select_local_data[] = { 0x00, 0x00, 0x00, 0x01 };
-#endif
 
 static int set_state(codec_controller_state state)
 {
@@ -107,18 +101,11 @@ static int select_local_mode(void)
   int ret;
 
 #if defined(CONFIG_AUDIO_CODEC_ADAU1787)
-  uint32_t revision;
-
   ret = hw_codec_select_local();
   if (ret != 0) {
     return ret;
   }
-
-  ret = dsp_parameter_controller_mirror_codec_update(
-      DSP_PARAMETER_ID_SOURCE_SELECT, 0U, source_select_local_data, sizeof(source_select_local_data), &revision);
-  if (ret != 0) {
-    return ret;
-  }
+  /* TODO: Route source selection through Codec Adapter after the parameter proof of concept. */
 #else
   LOG_DBG("Hardware codec disabled; selecting logical local mode only");
 #endif
@@ -138,18 +125,11 @@ static int select_broadcast_mode(void)
   int ret;
 
 #if defined(CONFIG_AUDIO_CODEC_ADAU1787)
-  uint32_t revision;
-
   ret = hw_codec_select_i2s();
   if (ret != 0) {
     return ret;
   }
-
-  ret = dsp_parameter_controller_mirror_codec_update(
-      DSP_PARAMETER_ID_SOURCE_SELECT, 0U, source_select_i2s_data, sizeof(source_select_i2s_data), &revision);
-  if (ret != 0) {
-    return ret;
-  }
+  /* TODO: Route source selection through Codec Adapter after the parameter proof of concept. */
 #else
   LOG_DBG("Hardware codec disabled; selecting logical broadcast mode only");
 #endif

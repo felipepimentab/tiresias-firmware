@@ -26,7 +26,6 @@ int main(void)
   ret = fw_info_app_print();
   ERR_CHK(ret);
 
-  /* Register persistent parameter settings before any subsystem can initialize Bluetooth. */
   ret = tiresias_service_init();
   ERR_CHK(ret);
 

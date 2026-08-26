@@ -6,21 +6,19 @@
 
 /**
  * @file
- * @brief Fixed DSP parameter contract and firmware-only codec bindings.
+ * @brief Fixed public DSP parameter contract.
  *
  * The catalog is the authoritative description of the DSP parameters exposed
  * by the MVP BLE contract. It assigns stable block and parameter IDs, describes
- * the public shape and capabilities of each parameter, and binds those public
- * definitions to private SigmaStudio DSP addresses.
+ * the public shape and capabilities of each parameter.
  *
  * Contract membership implies read access. Parameter contents are opaque byte
  * arrays with no numerical representation or byte-order semantics in firmware.
  * Human-readable names are intentionally kept in the matching workstation
  * contract rather than transmitted by the firmware.
  *
- * This module owns immutable metadata and zero-copy views of generated defaults.
- * It does not own runtime values, persistence, BLE request handling, or codec
- * access policy.
+ * This module owns immutable metadata only. It does not own runtime values,
+ * persistence, BLE request handling, or codec access.
  */
 
 #ifndef DSP_PARAMETER_CATALOG_H
@@ -36,9 +34,6 @@
 
 /** Total number of raw bytes across every parameter in the fixed contract. */
 #define DSP_PARAMETER_BYTE_COUNT (2U * 4U + 8U * 136U + 4U * 4U + 180U)
-
-/** Largest opaque byte array in the fixed contract. */
-#define DSP_PARAMETER_MAX_BYTE_COUNT 180U
 
 /**
  * @brief Public parameter access flags.
@@ -94,8 +89,7 @@ enum dsp_block_id {
  * @brief Stable identifiers for parameters exposed over BLE.
  *
  * IDs are the only parameter identity carried by parameter read and write
- * requests. The firmware uses an ID to index @ref dsp_parameter_addresses,
- * while the workstation resolves it to a display name.
+ * requests. The workstation resolves each ID to a display name.
  */
 enum dsp_parameter_id {
   /** ADC selection parameter. */
@@ -173,28 +167,5 @@ extern const struct dsp_parameter dsp_parameter_contract[DSP_PARAMETER_COUNT];
  * the catalog.
  */
 const struct dsp_parameter* dsp_parameter_definition(uint8_t id);
-
-/**
- * @brief Firmware-only DSP addresses indexed directly by parameter ID.
- *
- * Index zero is unused because public parameter IDs start at one. Each other
- * entry is the private byte address of that parameter's first byte. DSP
- * addresses are never transmitted over BLE.
- */
-extern const uint16_t dsp_parameter_addresses[DSP_PARAMETER_COUNT + 1U];
-
-/**
- * @brief Get a zero-copy view of a catalog parameter's SigmaStudio default.
- *
- * The returned pointer addresses the parameter's first byte in the generated
- * `Param_Data_IC_1_Sigma` array. Its byte length is available from the matching
- * catalog entry.
- *
- * @param id Stable parameter ID from the fixed contract.
- *
- * @return Pointer to the parameter's generated default bytes, or NULL when
- * @p id is outside the catalog or the ADAU1787 image is not enabled.
- */
-const uint8_t* dsp_parameter_default(uint8_t id);
 
 #endif /* DSP_PARAMETER_CATALOG_H */

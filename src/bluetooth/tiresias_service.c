@@ -8,7 +8,6 @@
 
 #include "dsp_parameter_catalog.h"
 #include "dsp_parameter_controller.h"
-#include "dsp_parameter_settings.h"
 
 #include <errno.h>
 #include <string.h>
@@ -376,15 +375,9 @@ K_THREAD_DEFINE(tiresias_service_thread_id, TIRESIAS_SERVICE_THREAD_STACK_SIZE, 
 int tiresias_service_init(void)
 {
   uint32_t contract_crc;
-  int ret;
 
   if (service_initialized) {
     return 0;
-  }
-
-  ret = dsp_parameter_settings_init();
-  if (ret != 0) {
-    return ret;
   }
 
   contract_crc = crc32_ieee((const uint8_t*)dsp_parameter_contract, sizeof(dsp_parameter_contract));

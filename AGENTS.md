@@ -17,6 +17,20 @@ Zephyr/NCS firmware for Tiresias DK.
   `hw_codec.c` as the reference implementation. The adapter is intended to
   replace `hw_codec.c` completely once it is implemented and validated.
 
+## DSP Parameter Proof of Concept
+
+- The current DSP parameter scope is only BLE communication with the workstation
+  and per-parameter persistence in internal flash.
+- Keep `dsp_parameter_catalog`, `dsp_parameter_controller`, and
+  `dsp_parameter_settings` small, single-purpose, and independent of codec
+  hardware. Do not add codec communication during this stage.
+- Prefer the simplest compile-time representation with a low RAM footprint. Avoid
+  dynamic allocation, general-purpose abstractions, and speculative extension
+  points.
+- Implement only validation and recovery required for the proof of concept to
+  operate safely. Record deferred robustness or hardware integration with a
+  concise `TODO` comment instead of adding complexity now.
+
 ## Useful Checks
 Allowed:
 - `git diff --check`

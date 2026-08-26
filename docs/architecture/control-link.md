@@ -109,29 +109,21 @@ MVP constraints:
 - one outstanding parameter operation;
 - up to four opaque parameter bytes per correlated `GET_PARAMETER` or `SET_PARAMETER` request;
 - the workstation exposes writes for the six fixed writable byte arrays; all 1,292 catalog bytes
-  are mirrored as per-parameter byte arrays in RAM;
+  are stored in one packed RAM image;
 - each parameter is persisted independently as raw bytes under its own stable-ID Zephyr
   Settings key; a successful SET saves only the complete parameter that owns the changed bytes;
 - the parameter controller decides when values are loaded and saved, while the DSP parameter
   settings adapter owns the Zephyr Settings keys and copies data without interpreting it;
-- startup copies the generated SigmaStudio defaults into the RAM arrays when the ADAU1787 is
-  enabled, or uses zero-filled opaque defaults in Bluetooth-only builds, then directly overlays
-  independently stored parameters. Missing or malformed entries leave their defaults in place
-  and are saved independently. ADAU1787 builds then write the resulting RAM bytes to codec
-  parameter memory;
-- internal routines that already changed the codec ask the controller to update and save only
-  the affected RAM parameter;
+- startup zero-fills the RAM image and overlays independently stored parameters. Missing entries
+  remain zero-filled;
 - the protocol revision is boot-local and is not persisted in flash;
 - parameter contents have no firmware or workstation interpretation;
 - no BLE raw RAM/register access, batch atomicity, or whole-profile replacement.
 
-Codec parameter I/O goes through Codec Adapter, the common boundary directly above the
-ADAU1787 driver. All calls into that boundary are compiled only when
-`CONFIG_AUDIO_CODEC_ADAU1787` is enabled. Bluetooth-only builds serve reads from RAM and persist
-writes without attempting codec access. In ADAU1787 builds, the adapter's parameter operations
-remain hardware-validation stubs; remote updates require codec success before flash and RAM are
-changed. The service advertises deferred DSP access until live adapter operations are
-implemented and hardware-validated.
+Codec parameter I/O is outside the proof-of-concept parameter path. Reads use the packed RAM
+image and writes update flash and RAM without attempting codec access. Future hardware access
+will go through Codec Adapter, the common boundary directly above the ADAU1787 driver. The
+service advertises deferred DSP application until that adapter is implemented and validated.
 
 A device-provided dynamic catalog and a generator based on the SigmaStudio `.params` export
 are post-MVP improvements. Compatibility negotiation for a dynamic catalog can be designed if
@@ -154,10 +146,10 @@ partial-application semantics.
 | ADAU1787 validation and access | Codec Controller |
 
 `bt_mgmt_init()` is mutex-protected and caches the first result for the boot; either Control
-Link or Audio Streaming may call first. Application startup registers the DSP settings handler
-before either subsystem can initialize Bluetooth and call `settings_load()`. The current build
-assigns advertising set 0 only to Control Link. New advertising clients require an
-allocator/composer and updated controller limits.
+Link or Audio Streaming may call first. The parameter controller initializes the idempotent
+Zephyr Settings backend and loads individual DSP settings directly. The current build assigns
+advertising set 0 only to Control Link. New advertising clients require an allocator/composer
+and updated controller limits.
 
 `bt_mgmt_adv_start()` is asynchronous. Control Link tracks the pending index and changes
 state only on `BT_MGMT_EXT_ADV_STARTED`; `BT_MGMT_EXT_ADV_FAILED` reports failure. ACL

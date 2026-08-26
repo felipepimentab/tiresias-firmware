@@ -24,12 +24,11 @@ Device Controller
   codec operations.
 - Codec Controller owns lifecycle, command validation, serialized access,
   presentation state, fallback policy, and error handling.
-- The DSP parameter catalog owns the fixed contract and ID-indexed private address
-  table. The parameter controller owns the complete RAM mirror and synchronizes
-  every catalog word with flash and codec parameter memory. It owns startup
-  restoration, GATT update ordering, internal-update mirroring, rollback policy,
-  and revisions. The DSP parameter settings adapter only serializes and retrieves
-  the complete versioned flash image through Zephyr Settings.
+- The DSP parameter catalog owns only the fixed public contract. The parameter
+  controller owns the packed RAM image, flash update ordering, and revision. The
+  DSP parameter settings adapter only loads and saves individual ID-keyed values
+  through Zephyr Settings. Codec parameter I/O remains outside this proof-of-concept
+  path and will be added later through Codec Adapter.
 
 Move Codec Controller and `hw_codec` out of `src/audio` and `src/modules` into a
 dedicated `src/codec_controller` directory, or `src/codec` if that name is
