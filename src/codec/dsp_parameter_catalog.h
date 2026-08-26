@@ -10,12 +10,19 @@
  *
  * The catalog is the authoritative description of the DSP parameters exposed
  * by the MVP BLE contract. It assigns stable block and parameter IDs, describes
- * the public shape and capabilities of each parameter.
+ * the public byte count and access flags of each parameter, and provides lookup
+ * by stable parameter ID.
  *
  * Contract membership implies read access. Parameter contents are opaque byte
  * arrays with no numerical representation or byte-order semantics in firmware.
  * Human-readable names are intentionally kept in the matching workstation
  * contract rather than transmitted by the firmware.
+ *
+ * IDs are dense, start at one, and match the order of
+ * @ref dsp_parameter_contract. The ordered four-byte definitions form the
+ * public contract fingerprint. Any contract change must also update
+ * @ref DSP_PARAMETER_COUNT, @ref DSP_PARAMETER_BYTE_COUNT,
+ * @ref DSP_PARAMETER_CONTRACT_CRC32, and the workstation contract.
  *
  * This module owns immutable metadata only. It does not own runtime values,
  * persistence, BLE request handling, or codec access.
@@ -26,13 +33,24 @@
 
 #include <stdint.h>
 
-/** CRC-32 fingerprint of the ordered public parameter contract. */
+/**
+ * @brief CRC-32 fingerprint of the ordered public parameter contract.
+ *
+ * The fingerprint is calculated over the raw bytes of
+ * @ref dsp_parameter_contract and is used to detect firmware/workstation
+ * contract mismatches.
+ */
 #define DSP_PARAMETER_CONTRACT_CRC32 0x22045C5CU
 
 /** Number of entries in @ref dsp_parameter_contract. */
 #define DSP_PARAMETER_COUNT 15U
 
-/** Total number of raw bytes across every parameter in the fixed contract. */
+/**
+ * @brief Total number of parameter-value bytes in the fixed contract.
+ *
+ * The controller uses this value to allocate its packed RAM image. It must
+ * equal the sum of every @ref dsp_parameter.byte_count entry.
+ */
 #define DSP_PARAMETER_BYTE_COUNT (2U * 4U + 8U * 136U + 4U * 4U + 180U)
 
 /**
@@ -149,7 +167,8 @@ struct dsp_parameter {
  * @brief Ordered public parameter contract.
  *
  * Entries are ordered by ID, so a validated nonzero ID maps to array index
- * `id - 1`.
+ * `id - 1`. The controller also concatenates parameter values in this order in
+ * its packed RAM image.
  *
  * The entry order and contents participate in
  * @ref DSP_PARAMETER_CONTRACT_CRC32. Any contract change must be mirrored in
@@ -164,7 +183,8 @@ extern const struct dsp_parameter dsp_parameter_contract[DSP_PARAMETER_COUNT];
  * @param id Stable parameter ID from the fixed contract.
  *
  * @return Pointer to the immutable catalog entry, or NULL when @p id is not in
- * the catalog.
+ * the catalog. The returned pointer remains valid for the lifetime of the
+ * firmware.
  */
 const struct dsp_parameter* dsp_parameter_definition(uint8_t id);
 
