@@ -8,16 +8,16 @@
  * @file
  * @brief Mutable parameter state for the fixed codec contract.
  *
- * This module owns the mutable state of every contract parameter. Values are
- * concatenated in contract order in one @ref CODEC_PARAMETER_BYTE_COUNT-byte RAM
- * image. The module validates public IDs, access flags, and byte ranges, and
- * serializes initialization, reads, and writes with one mutex.
+ * This module owns one mutable byte buffer for every contract parameter. A
+ * fixed pointer table maps stable parameter IDs to their buffers. The module
+ * validates public IDs, access flags, and byte ranges, and serializes
+ * initialization, reads, and writes with one mutex.
  *
- * Initialization zero-fills the RAM image and overlays independently persisted
- * values through codec_settings. A successful change saves the complete
- * owning parameter before updating RAM. The boot-local revision advances once
- * for each successfully persisted change and does not advance for failed or
- * no-op writes.
+ * Initialization zero-fills the parameter buffers and overlays independently
+ * persisted values through codec_settings. A successful change saves the
+ * complete owning parameter before updating RAM. The boot-local revision
+ * advances once for each successfully persisted change and does not advance for
+ * failed or no-op writes.
  *
  * This proof-of-concept module performs no codec hardware access. Contract
  * metadata belongs to codec_contract and Zephyr Settings mechanics belong to
@@ -32,16 +32,16 @@
 #include <stdint.h>
 
 /**
- * @brief Initialize the runtime parameter image from flash.
+ * @brief Initialize the runtime parameter buffers from flash.
  *
- * The function initializes the Zephyr Settings backend, zero-fills the packed
- * RAM image, and loads each parameter from its independent settings key. A
- * missing key leaves that parameter zero-filled. The revision is reset to zero
- * for the current boot.
+ * The function initializes the Zephyr Settings backend, zero-fills every
+ * parameter buffer, and loads each parameter from its independent settings key.
+ * A missing key leaves that parameter zero-filled. The revision is reset to
+ * zero for the current boot.
  *
  * Successful repeated calls have no effect. A failed call leaves the module
  * unavailable; a later call retries initialization from a newly zero-filled
- * image.
+ * set of buffers.
  *
  * @retval 0 Initialization completed or had already completed.
  * @return A negative errno-style value from settings initialization or loading.
@@ -49,7 +49,7 @@
 int codec_parameters_init(void);
 
 /**
- * @brief Read an opaque byte range from the RAM image.
+ * @brief Read an opaque byte range from a parameter buffer.
  *
  * Reads never access flash or codec hardware. The bytes and revision are copied
  * while the module mutex is held, so they describe the same committed RAM
@@ -71,10 +71,10 @@ int codec_parameters_init(void);
 int codec_parameters_get(uint8_t id, uint8_t byte_offset, uint8_t* data, size_t size, uint32_t* revision);
 
 /**
- * @brief Persist an opaque byte range and update the RAM image.
+ * @brief Persist an opaque byte range and update its parameter buffer.
  *
  * The requested bytes are merged into a temporary copy of the complete owning
- * parameter. That complete value is saved to flash before the RAM image and
+ * parameter. That complete value is saved to flash before the RAM buffer and
  * revision are updated. A persistence failure therefore leaves RAM and the
  * revision unchanged.
  *
@@ -101,7 +101,7 @@ int codec_parameters_get(uint8_t id, uint8_t byte_offset, uint8_t* data, size_t 
 int codec_parameters_set(uint8_t id, uint8_t byte_offset, const uint8_t* data, size_t size, uint32_t* revision);
 
 /**
- * @brief Return the boot-local revision of the committed RAM image.
+ * @brief Return the boot-local revision of the committed parameter buffers.
  *
  * The value is zero before and immediately after initialization. It increments
  * after each successful write that changes a parameter.
@@ -116,7 +116,7 @@ uint32_t codec_parameters_revision(void);
  * This status describes only RAM and flash initialization. Codec hardware is
  * outside the proof-of-concept parameter path.
  *
- * @retval true The RAM image is available for parameter requests.
+ * @retval true The parameter buffers are available for requests.
  * @retval false Initialization has not completed successfully.
  */
 bool codec_parameters_loaded(void);

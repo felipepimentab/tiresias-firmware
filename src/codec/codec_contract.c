@@ -39,8 +39,12 @@ const struct codec_parameter* codec_contract_find(uint8_t id)
     return NULL;
   }
 
-  parameter = &codec_contract[id - 1U];
-  return parameter->id == id ? parameter : NULL;
+  parameter = &codec_contract[CODEC_PARAMETER_INDEX(id)];
+  if (parameter->id != id) {
+    return NULL;
+  }
+
+  return parameter;
 }
 
 BUILD_ASSERT(sizeof(struct codec_parameter) == 4U, "The fixed contract fingerprint requires four-byte entries");

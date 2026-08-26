@@ -109,19 +109,19 @@ MVP constraints:
 - one outstanding parameter operation;
 - up to four opaque parameter bytes per correlated `GET_PARAMETER` or `SET_PARAMETER` request;
 - the workstation exposes writes for the six fixed writable byte arrays; all 1,292 catalog bytes
-  are stored in one packed RAM image;
+  are stored in separate fixed-size parameter buffers;
 - each parameter is persisted independently as raw bytes under its own stable-ID Zephyr
   Settings key; a successful SET saves only the complete parameter that owns the changed bytes;
 - Codec Parameters decides when values are loaded and saved, while Codec Settings owns the
   Zephyr Settings keys and copies data without interpreting it;
-- startup zero-fills the RAM image and overlays independently stored parameters. Missing entries
-  remain zero-filled;
+- startup zero-fills the parameter buffers and overlays independently stored parameters.
+  Missing entries remain zero-filled;
 - the protocol revision is boot-local and is not persisted in flash;
 - parameter contents have no firmware or workstation interpretation;
 - no BLE raw RAM/register access, batch atomicity, or whole-profile replacement.
 
-Codec parameter I/O is outside the proof-of-concept parameter path. Reads use the packed RAM
-image and writes update flash and RAM without attempting codec access. Future hardware access
+Codec parameter I/O is outside the proof-of-concept parameter path. Reads use the parameter
+buffers and writes update flash and RAM without attempting codec access. Future hardware access
 will go through Codec Adapter, the common boundary directly above the ADAU1787 driver. The
 service advertises deferred DSP application until that adapter is implemented and validated.
 

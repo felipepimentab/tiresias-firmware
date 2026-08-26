@@ -32,6 +32,7 @@
 #define CODEC_CONTRACT_H
 
 #include "adau1787.h"
+#include <stddef.h>
 #include <stdint.h>
 
 /**
@@ -52,10 +53,11 @@
 /**
  * @brief Total number of parameter-value bytes in the fixed contract.
  *
- * Codec Parameters uses this value to allocate its packed RAM image. It must
- * equal the sum of every @ref codec_parameter.byte_count entry.
+ * This must equal the sum of every @ref codec_parameter.byte_count entry and
+ * the combined size of the runtime parameter buffers.
  */
-#define CODEC_PARAMETER_BYTE_COUNT (2U * 4U + 8U * 136U + 4U * 4U + 180U)
+#define CODEC_PARAMETER_BYTE_COUNT                                                                                     \
+  (6U * CODEC_BYTES_FROM_WORDS(1) + 8U * CODEC_BYTES_FROM_WORDS(34) + CODEC_BYTES_FROM_WORDS(45))
 
 /**
  * @brief Public parameter access flags.
@@ -114,6 +116,8 @@ enum dsp_block_id {
  * requests. The workstation resolves each ID to a display name.
  */
 enum dsp_parameter_id {
+  /** Reserved invalid or unset parameter identifier. */
+  DSP_PARAMETER_ID_INVALID = 0,
   /** ADC selection parameter. */
   DSP_PARAMETER_ID_ADC_SELECT = 1,
   /** Source selection parameter. */
@@ -171,8 +175,7 @@ struct codec_parameter {
  * @brief Ordered public parameter contract.
  *
  * Entries are ordered by ID, so a validated nonzero ID maps to array index
- * `id - 1`. Codec Parameters also concatenates values in this order in its
- * packed RAM image.
+ * `id - 1`.
  *
  * The entry order and contents participate in
  * @ref CODEC_CONTRACT_CRC32. Any contract change must be mirrored in
@@ -191,5 +194,14 @@ extern const struct codec_parameter codec_contract[CODEC_PARAMETER_COUNT];
  * firmware.
  */
 const struct codec_parameter* codec_contract_find(uint8_t id);
+
+/**
+ * @brief Convert a validated stable parameter ID to its dense array index.
+ *
+ * @param id Nonzero parameter ID from the fixed contract.
+ *
+ * @return Zero-based array index corresponding to @p id.
+ */
+#define CODEC_PARAMETER_INDEX(id) ((size_t)(id) - 1U)
 
 #endif /* CODEC_CONTRACT_H */
