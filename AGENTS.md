@@ -21,9 +21,9 @@ Zephyr/NCS firmware for Tiresias DK.
 
 - The current DSP parameter scope is only BLE communication with the workstation
   and per-parameter persistence in internal flash.
-- Keep `codec_contract`, `codec_parameters`, and `codec_settings` small,
-  single-purpose, and independent of codec
-  hardware. Do not add codec communication during this stage.
+- Keep `codec_contract`, `codec_values`, `codec_parameters`, and
+  `codec_settings` small, single-purpose, and independent of codec hardware. Do
+  not add codec communication during this stage.
 - Prefer the simplest compile-time representation with a low RAM footprint. Avoid
   dynamic allocation, general-purpose abstractions, and speculative extension
   points.

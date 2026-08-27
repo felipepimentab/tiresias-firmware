@@ -24,11 +24,12 @@ Device Controller
   codec operations.
 - Codec Controller owns lifecycle, command validation, serialized access,
   presentation state, fallback policy, and error handling.
-- Codec Contract owns only the fixed public contract. Codec Parameters owns the
-  fixed parameter buffers, flash update ordering, and revision. Codec Settings
-  only loads and saves individual ID-keyed values through Zephyr Settings. Codec
-  parameter I/O remains outside this proof-of-concept path and will be added
-  later through Codec Adapter.
+- Codec Contract owns only the fixed public contract. Codec Values owns the
+  fixed parameter buffers. Codec Parameters owns validation, synchronization,
+  flash update ordering, and revision. Codec Settings only loads and saves
+  individual ID-keyed values through Zephyr Settings. Codec parameter I/O
+  remains outside this proof-of-concept path and will be added later through
+  Codec Adapter.
 
 Move Codec Controller and `hw_codec` out of `src/audio` and `src/modules` into a
 dedicated `src/codec_controller` directory, or `src/codec` if that name is

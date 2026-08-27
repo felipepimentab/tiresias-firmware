@@ -25,9 +25,9 @@ streaming begins; codec programming therefore precedes regular BCLK/LRCK frames.
 4. The driver asserts `!PD`, configures MP3-MP6 low, releases `!PD`, and waits 100 ms.
 5. The generated SigmaDSP sequence runs, including its 35 ms delay.
 6. The generated FastDSP sequence stops and starts FastDSP.
-7. Codec Parameters loads the generated defaults into its RAM mirror and checks
-   flash. A valid non-default flash image is restored to codec parameter memory; absent or
-   invalid storage is initialized from the defaults already loaded into the codec.
+7. Codec Parameters loads the generated defaults into Codec Values and checks flash. A valid
+   non-default flash image is restored to codec parameter memory; absent or invalid storage is
+   initialized from the defaults already loaded into the codec.
 8. Codec Controller enters `LOCAL_ONLY` and mirrors Source Select to flash and RAM if needed.
 9. On `LE_AUDIO_EVT_STREAMING`, Audio Streaming calls `audio_system_start()` and starts
    double-buffered I2S.

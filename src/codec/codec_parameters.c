@@ -8,55 +8,21 @@
 
 #include "codec_contract.h"
 #include "codec_settings.h"
+#include "codec_values.h"
 
 #include <errno.h>
 #include <string.h>
 #include <zephyr/kernel.h>
 #include <zephyr/sys/atomic.h>
-#include <zephyr/sys/util.h>
 
 static K_MUTEX_DEFINE(parameter_mutex);
-
-static uint8_t adc_select[CODEC_BYTES_FROM_WORDS(1)];
-static uint8_t source_select[CODEC_BYTES_FROM_WORDS(1)];
-static uint8_t band_1_compressor_lut[CODEC_BYTES_FROM_WORDS(34)];
-static uint8_t band_2_compressor_lut[CODEC_BYTES_FROM_WORDS(34)];
-static uint8_t band_3_compressor_lut[CODEC_BYTES_FROM_WORDS(34)];
-static uint8_t band_4_compressor_lut[CODEC_BYTES_FROM_WORDS(34)];
-static uint8_t band_5_compressor_lut[CODEC_BYTES_FROM_WORDS(34)];
-static uint8_t band_6_compressor_lut[CODEC_BYTES_FROM_WORDS(34)];
-static uint8_t band_7_compressor_lut[CODEC_BYTES_FROM_WORDS(34)];
-static uint8_t band_8_compressor_lut[CODEC_BYTES_FROM_WORDS(34)];
-static uint8_t phase_comp_gain_1[CODEC_BYTES_FROM_WORDS(1)];
-static uint8_t phase_comp_gain_2[CODEC_BYTES_FROM_WORDS(1)];
-static uint8_t phase_comp_gain_3[CODEC_BYTES_FROM_WORDS(1)];
-static uint8_t output_headroom_gain[CODEC_BYTES_FROM_WORDS(1)];
-static uint8_t soft_clip_lut[CODEC_BYTES_FROM_WORDS(45)];
-
-static uint8_t* const parameter_storage[] = {
-  [CODEC_PARAMETER_INDEX(DSP_PARAMETER_ID_ADC_SELECT)] = adc_select,
-  [CODEC_PARAMETER_INDEX(DSP_PARAMETER_ID_SOURCE_SELECT)] = source_select,
-  [CODEC_PARAMETER_INDEX(DSP_PARAMETER_ID_BAND_1_COMPRESSOR_LUT)] = band_1_compressor_lut,
-  [CODEC_PARAMETER_INDEX(DSP_PARAMETER_ID_BAND_2_COMPRESSOR_LUT)] = band_2_compressor_lut,
-  [CODEC_PARAMETER_INDEX(DSP_PARAMETER_ID_BAND_3_COMPRESSOR_LUT)] = band_3_compressor_lut,
-  [CODEC_PARAMETER_INDEX(DSP_PARAMETER_ID_BAND_4_COMPRESSOR_LUT)] = band_4_compressor_lut,
-  [CODEC_PARAMETER_INDEX(DSP_PARAMETER_ID_BAND_5_COMPRESSOR_LUT)] = band_5_compressor_lut,
-  [CODEC_PARAMETER_INDEX(DSP_PARAMETER_ID_BAND_6_COMPRESSOR_LUT)] = band_6_compressor_lut,
-  [CODEC_PARAMETER_INDEX(DSP_PARAMETER_ID_BAND_7_COMPRESSOR_LUT)] = band_7_compressor_lut,
-  [CODEC_PARAMETER_INDEX(DSP_PARAMETER_ID_BAND_8_COMPRESSOR_LUT)] = band_8_compressor_lut,
-  [CODEC_PARAMETER_INDEX(DSP_PARAMETER_ID_PHASE_COMP_GAIN_1)] = phase_comp_gain_1,
-  [CODEC_PARAMETER_INDEX(DSP_PARAMETER_ID_PHASE_COMP_GAIN_2)] = phase_comp_gain_2,
-  [CODEC_PARAMETER_INDEX(DSP_PARAMETER_ID_PHASE_COMP_GAIN_3)] = phase_comp_gain_3,
-  [CODEC_PARAMETER_INDEX(DSP_PARAMETER_ID_OUTPUT_HEADROOM_GAIN)] = output_headroom_gain,
-  [CODEC_PARAMETER_INDEX(DSP_PARAMETER_ID_SOFT_CLIP_LUT)] = soft_clip_lut,
-};
 
 static atomic_t current_revision;
 static atomic_t parameters_initialized;
 
 static uint8_t* parameter_value(const struct codec_parameter* parameter, uint8_t byte_offset)
 {
-  return &parameter_storage[CODEC_PARAMETER_INDEX(parameter->id)][byte_offset];
+  return &codec_values_get(parameter->id)[byte_offset];
 }
 
 static bool parameter_range_valid(const struct codec_parameter* parameter, uint8_t byte_offset, size_t size)
@@ -104,9 +70,7 @@ int codec_parameters_init(void)
     goto out;
   }
 
-  for (size_t index = 0U; index < ARRAY_SIZE(parameter_storage); index++) {
-    memset(parameter_storage[index], 0, codec_contract[index].byte_count);
-  }
+  codec_values_reset();
   atomic_clear(&current_revision);
 
   for (size_t index = 0U; index < CODEC_PARAMETER_COUNT; index++) {
@@ -195,12 +159,3 @@ bool codec_parameters_loaded(void)
 {
   return atomic_get(&parameters_initialized) != 0;
 }
-
-BUILD_ASSERT(ARRAY_SIZE(parameter_storage) == CODEC_PARAMETER_COUNT, "Every contract parameter needs RAM storage");
-BUILD_ASSERT(sizeof(adc_select) + sizeof(source_select) + sizeof(band_1_compressor_lut) + sizeof(band_2_compressor_lut)
-            + sizeof(band_3_compressor_lut) + sizeof(band_4_compressor_lut) + sizeof(band_5_compressor_lut)
-            + sizeof(band_6_compressor_lut) + sizeof(band_7_compressor_lut) + sizeof(band_8_compressor_lut)
-            + sizeof(phase_comp_gain_1) + sizeof(phase_comp_gain_2) + sizeof(phase_comp_gain_3)
-            + sizeof(output_headroom_gain) + sizeof(soft_clip_lut)
-        == CODEC_PARAMETER_BYTE_COUNT,
-    "Parameter buffers must match the contract byte count");

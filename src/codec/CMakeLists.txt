@@ -10,6 +10,7 @@ target_sources(app PRIVATE
                ${CMAKE_CURRENT_SOURCE_DIR}/codec_contract.c
                ${CMAKE_CURRENT_SOURCE_DIR}/codec_parameters.c
                ${CMAKE_CURRENT_SOURCE_DIR}/codec_settings.c
+               ${CMAKE_CURRENT_SOURCE_DIR}/codec_values.c
                ${CMAKE_CURRENT_SOURCE_DIR}/codec_adapter.c
                ${CMAKE_CURRENT_SOURCE_DIR}/hw_codec.c
 )

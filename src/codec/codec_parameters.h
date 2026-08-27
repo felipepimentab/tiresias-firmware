@@ -6,12 +6,11 @@
 
 /**
  * @file
- * @brief Mutable parameter state for the fixed codec contract.
+ * @brief Coordination of runtime codec parameters and persistence.
  *
- * This module owns one mutable byte buffer for every contract parameter. A
- * fixed pointer table maps stable parameter IDs to their buffers. The module
- * validates public IDs, access flags, and byte ranges, and serializes
- * initialization, reads, and writes with one mutex.
+ * This module validates public IDs, access flags, and byte ranges, and
+ * serializes initialization, reads, and writes with one mutex. Codec Values
+ * owns the mutable parameter buffers and Codec Settings owns persistence.
  *
  * Initialization zero-fills the parameter buffers and overlays independently
  * persisted values through codec_settings. A successful change saves the
@@ -20,8 +19,7 @@
  * failed or no-op writes.
  *
  * This proof-of-concept module performs no codec hardware access. Contract
- * metadata belongs to codec_contract and Zephyr Settings mechanics belong to
- * codec_settings.
+ * metadata belongs to codec_contract.
  */
 
 #ifndef CODEC_PARAMETERS_H

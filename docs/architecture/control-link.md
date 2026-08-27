@@ -109,11 +109,11 @@ MVP constraints:
 - one outstanding parameter operation;
 - up to four opaque parameter bytes per correlated `GET_PARAMETER` or `SET_PARAMETER` request;
 - the workstation exposes writes for the six fixed writable byte arrays; all 1,292 catalog bytes
-  are stored in separate fixed-size parameter buffers;
+  are stored in separate fixed-size parameter buffers owned by Codec Values;
 - each parameter is persisted independently as raw bytes under its own stable-ID Zephyr
   Settings key; a successful SET saves only the complete parameter that owns the changed bytes;
-- Codec Parameters decides when values are loaded and saved, while Codec Settings owns the
-  Zephyr Settings keys and copies data without interpreting it;
+- Codec Parameters coordinates loading and saving, while Codec Settings owns the Zephyr Settings
+  keys and Codec Values owns the RAM buffers;
 - startup zero-fills the parameter buffers and overlays independently stored parameters.
   Missing entries remain zero-filled;
 - the protocol revision is boot-local and is not persisted in flash;
