@@ -42,7 +42,7 @@
  * @ref codec_contract and is used to detect firmware/workstation
  * contract mismatches.
  */
-#define CODEC_CONTRACT_CRC32 0x22045C5CU
+#define CODEC_CONTRACT_CRC32 0x098986FAU
 
 /** Number of entries in @ref codec_contract. */
 #define CODEC_PARAMETER_COUNT 15U
@@ -115,7 +115,7 @@ enum dsp_block_id {
  * IDs are the only parameter identity carried by parameter read and write
  * requests. The workstation resolves each ID to a display name.
  */
-enum dsp_parameter_id {
+typedef enum dsp_parameter_id {
   /** Reserved invalid or unset parameter identifier. */
   DSP_PARAMETER_ID_INVALID = 0,
   /** ADC selection parameter. */
@@ -148,7 +148,7 @@ enum dsp_parameter_id {
   DSP_PARAMETER_ID_OUTPUT_HEADROOM_GAIN = 14,
   /** Soft-clip lookup table. */
   DSP_PARAMETER_ID_SOFT_CLIP_LUT = 15,
-};
+} dsp_parameter_id;
 
 /**
  * @brief Compact public definition of one DSP parameter.

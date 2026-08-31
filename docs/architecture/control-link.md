@@ -81,7 +81,7 @@ Protocol constants and result values are public in `tiresias_service.h`. Transac
 nonzero flags, and nonzero GET data are invalid. CCC, readiness, malformed-length, and busy
 failures are rejected at ATT admission; every accepted request completes with one indication
 using the same nonzero transaction ID while the session remains connected. Protocol v4 uses
-the single DSP contract fingerprint CRC32 `0x22045c5c`.
+the single DSP contract fingerprint CRC32 `0x098986fa`.
 
 ## Fixed DSP contract
 
@@ -92,9 +92,8 @@ live in the workstation contract, while DSP addresses remain private to firmware
 assigns numerical meaning, byte order, ranges, or units to parameter contents.
 
 The fixed parameters are ADC Select, Source Select, eight 136-byte compressor LUTs, three
-phase-compensation gains, Output Headroom Gain, and the 180-byte Soft Clip LUT. Selectors and
-gains are writable byte arrays. LUTs are readable and remain read-only until an atomic
-multi-chunk write protocol exists.
+phase-compensation gains, Output Headroom Gain, and the 180-byte Soft Clip LUT. Selectors,
+compressor LUTs, and gains are writable byte arrays; the Soft Clip LUT remains read-only.
 
 The client identifies a chunk with `(parameter_id, byte_offset)`. It reads four opaque bytes at
 each offset from zero through `byte_count - 1` to assemble a parameter. Each chunk receives its
@@ -108,7 +107,7 @@ MVP constraints:
 
 - one outstanding parameter operation;
 - up to four opaque parameter bytes per correlated `GET_PARAMETER` or `SET_PARAMETER` request;
-- the workstation exposes writes for the six fixed writable byte arrays; all 1,292 catalog bytes
+- the workstation exposes writes for the fourteen fixed writable byte arrays; all 1,292 catalog bytes
   are stored in separate fixed-size parameter buffers owned by Codec Values;
 - each parameter is persisted independently as raw bytes under its own stable-ID Zephyr
   Settings key; a successful SET saves only the complete parameter that owns the changed bytes;
