@@ -7,6 +7,9 @@ clear ownership boundaries.
 
 ## Codec boundary
 
+See [Codec subsystem](codec-subsystem.md) for the detailed current and planned
+module graph, responsibility table, and initialization flow.
+
 Use the following dependency direction:
 
 ```text

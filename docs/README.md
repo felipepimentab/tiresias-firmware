@@ -6,6 +6,8 @@ Quick references are grouped by scope.
 
 - [System context](architecture/system-context.md): product and PoC boundaries.
 - [Control plane](architecture/control-plane.md): subsystem ownership and states.
+- [Codec subsystem](architecture/codec-subsystem.md): codec module boundaries,
+  dependencies, and planned hardware integration.
 - [Control Link](architecture/control-link.md): BLE management protocol design.
 - [Threads and contexts](architecture/threads-and-contexts.md): execution and priority rules.
 - [Zbus](architecture/zbus.md): channel ownership and delivery contracts.
