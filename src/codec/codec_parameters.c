@@ -7,6 +7,7 @@
 #include "codec_parameters.h"
 
 #include "codec_contract.h"
+#include "codec_defaults.h"
 #include "codec_settings.h"
 #include "codec_values.h"
 
@@ -70,11 +71,15 @@ int codec_parameters_init(void)
     goto out;
   }
 
-  codec_values_reset();
   atomic_clear(&current_revision);
 
   for (size_t index = 0U; index < CODEC_PARAMETER_COUNT; index++) {
     const struct codec_parameter* parameter = &codec_contract[index];
+
+    ret = codec_defaults_copy(parameter->id, parameter_value(parameter, 0U), parameter->byte_count);
+    if (ret != 0) {
+      goto out;
+    }
 
     ret = codec_settings_load(parameter->id, parameter_value(parameter, 0U), parameter->byte_count);
     if (ret != 0) {
