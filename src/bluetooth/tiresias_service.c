@@ -282,11 +282,12 @@ static void process_request(const struct tiresias_request* request)
 {
   struct bt_conn* conn;
   const struct codec_parameter* parameter = NULL;
-  uint8_t data[TIRESIAS_PARAMETER_CHUNK_SIZE] = { 0 };
+  uint8_t parameter_value[CODEC_PARAMETER_MAX_BYTE_COUNT];
+  uint8_t response_data[TIRESIAS_PARAMETER_CHUNK_SIZE] = { 0 };
   uint32_t revision = codec_parameters_revision();
   bool setting = request->opcode == TIRESIAS_OPCODE_SET_PARAMETER;
   enum tiresias_result result;
-  size_t size = 1U;
+  size_t chunk_size;
   int ret;
 
   if (!session_is_active(request->session_id)) {
@@ -295,15 +296,30 @@ static void process_request(const struct tiresias_request* request)
   }
 
   parameter = codec_contract_find(request->parameter_id);
-  if (parameter != NULL && request->byte_offset < parameter->byte_count) {
-    size = MIN(sizeof(data), parameter->byte_count - request->byte_offset);
+  if (parameter == NULL) {
+    ret = -ENOENT;
+    goto result;
+  }
+  if (request->byte_offset >= parameter->byte_count) {
+    ret = -ERANGE;
+    goto result;
+  }
+
+  chunk_size = MIN(sizeof(response_data), parameter->byte_count - request->byte_offset);
+  ret = codec_parameters_get(request->parameter_id, parameter_value, parameter->byte_count, &revision);
+  if (ret != 0) {
+    goto result;
   }
 
   if (setting) {
-    ret = codec_parameters_set(request->parameter_id, request->byte_offset, request->data, size, &revision);
+    memcpy(&parameter_value[request->byte_offset], request->data, chunk_size);
+    ret = codec_parameters_set(request->parameter_id, parameter_value, parameter->byte_count, &revision);
+    memcpy(response_data, request->data, chunk_size);
   } else {
-    ret = codec_parameters_get(request->parameter_id, request->byte_offset, data, size, &revision);
+    memcpy(response_data, &parameter_value[request->byte_offset], chunk_size);
   }
+
+result:
   result = map_result(ret, setting);
 
   k_mutex_lock(&service_mutex, K_FOREVER);
@@ -322,10 +338,7 @@ static void process_request(const struct tiresias_request* request)
   sys_put_le32(request->transaction_id, &response_wire[2]);
   response_wire[6] = request->parameter_id;
   response_wire[7] = request->byte_offset;
-  if (setting) {
-    memcpy(data, request->data, size);
-  }
-  memcpy(&response_wire[8], data, sizeof(data));
+  memcpy(&response_wire[8], response_data, sizeof(response_data));
   sys_put_le32(revision, &response_wire[12]);
 
   conn = get_control_connection();

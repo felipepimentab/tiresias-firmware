@@ -59,6 +59,9 @@
 #define CODEC_PARAMETER_BYTE_COUNT                                                                                     \
   (6U * CODEC_BYTES_FROM_WORDS(1) + 8U * CODEC_BYTES_FROM_WORDS(34) + CODEC_BYTES_FROM_WORDS(45))
 
+/** Size of the largest opaque parameter value in the fixed contract. */
+#define CODEC_PARAMETER_MAX_BYTE_COUNT CODEC_BYTES_FROM_WORDS(45)
+
 /**
  * @brief Public parameter access flags.
  *

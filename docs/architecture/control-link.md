@@ -98,10 +98,12 @@ compressor LUTs, and gains are writable byte arrays; the Soft Clip LUT remains r
 The client identifies a chunk with `(parameter_id, byte_offset)`. It reads four opaque bytes at
 each offset from zero through `byte_count - 1` to assemble a parameter. Each chunk receives its
 own transaction ID and correlated indication; revision must remain stable across the assembled read.
+Chunking belongs only to the BLE transport. Codec Parameters accepts and returns complete parameter
+values; Control Link translates between the transport chunk and that whole-value interface.
 
 Normal requests use stable IDs. Control Link validates framing, readiness, size, and queue
-capacity. Codec Parameters treats payloads as bytes and performs only access and
-structural bounds checks required for safe access.
+capacity. Codec Parameters treats each value as one opaque byte array and performs only access and
+whole-value size checks required for safe access.
 
 MVP constraints:
 
@@ -113,8 +115,8 @@ MVP constraints:
   Settings key; a successful SET saves only the complete parameter that owns the changed bytes;
 - Codec Parameters coordinates loading and saving, while Codec Settings owns the Zephyr Settings
   keys and Codec Values owns the RAM buffers;
-- startup zero-fills the parameter buffers and overlays independently stored parameters.
-  Missing entries remain zero-filled;
+- startup copies defaults from the SigmaStudio parameter image and overlays independently stored
+  parameters. Missing entries retain their generated defaults;
 - the protocol revision is boot-local and is not persisted in flash;
 - parameter contents have no firmware or workstation interpretation;
 - no BLE raw RAM/register access, batch atomicity, or whole-profile replacement.
