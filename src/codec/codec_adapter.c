@@ -5,9 +5,20 @@
  */
 
 #include "codec_adapter.h"
+#include "adau1787.h"
+#include "sigma_exports.h"
 
 #include <errno.h>
+#include <zephyr/logging/log.h>
 #include <zephyr/sys/util.h>
+
+LOG_MODULE_REGISTER(codec_adapter, CONFIG_LOG_DEFAULT_LEVEL);
+
+#define ADC_SOURCE_SWITCH_ADDRESS MOD_ADCSELECT_MONOSWSLEW_ADDR
+#define LISTENING_MODE_SWITCH_ADDRESS MOD_SOURCESELECT_STEREOSWSLEW_ADDR
+#define LISTENING_MODE_I2S 0U
+#define LISTENING_MODE_LOCAL 1U
+#define SAFELOAD_MAX_WORDS 5U
 
 int codec_param_read(uint16_t start_addr, uint8_t* data, size_t len)
 {
@@ -20,9 +31,84 @@ int codec_param_read(uint16_t start_addr, uint8_t* data, size_t len)
 
 int codec_param_write(uint16_t start_addr, const uint8_t* data, size_t len)
 {
-  ARG_UNUSED(start_addr);
-  ARG_UNUSED(data);
-  ARG_UNUSED(len);
+  size_t available_bytes;
+  reg_word_t sdsp_run;
+  int restart_ret;
+  int ret;
 
-  return -ENOTSUP;
+  if (data == NULL || len == 0U) {
+    return -EINVAL;
+  }
+  if (!IS_PARAM_ADDR(start_addr)) {
+    return -EINVAL;
+  }
+
+  available_bytes = (size_t)ADAU1787_PARAM_RAM_END - start_addr + 1U;
+  if (len > available_bytes) {
+    return -EINVAL;
+  }
+  if (((start_addr - ADAU1787_PARAM_RAM_BASE) % ADAU1787_PARAM_RAM_WIDTH_BYTES) != 0U
+      || (len % ADAU1787_PARAM_RAM_WIDTH_BYTES) != 0U) {
+    return -EINVAL;
+  }
+
+  if (len <= SAFELOAD_MAX_WORDS * ADAU1787_PARAM_RAM_WIDTH_BYTES) {
+    return adau1787_safeload_write(start_addr, (uint8_t*)data, len / ADAU1787_PARAM_RAM_WIDTH_BYTES);
+  }
+
+  sdsp_run = 0U;
+  ret = adau1787_write_register(REG_SDSP_CTRL2_IC_1_Sigma_ADDR, &sdsp_run);
+  if (ret != 0) {
+    LOG_ERR("Failed to stop SigmaDSP before parameter write: %d", ret);
+    return ret;
+  }
+
+  ret = adau1787_write(start_addr, (uint8_t*)data, len);
+  if (ret != 0) {
+    LOG_ERR("Failed to write %zu parameter bytes at 0x%04X: %d", len, start_addr, ret);
+  }
+
+  sdsp_run = R110_SDSP_RUN_IC_1_Sigma;
+  restart_ret = adau1787_write_register(REG_SDSP_CTRL2_IC_1_Sigma_ADDR, &sdsp_run);
+  if (restart_ret != 0) {
+    LOG_ERR("Failed to restart SigmaDSP after parameter write: %d", restart_ret);
+    if (ret == 0) {
+      ret = restart_ret;
+    }
+  }
+
+  return ret;
+}
+
+static int select_listening_mode(uint32_t mode)
+{
+  param_word_t codec_param = {
+    (mode >> 24) & 0xFF,
+    (mode >> 16) & 0xFF,
+    (mode >> 8) & 0xFF,
+    mode & 0xFF,
+  };
+  int ret;
+
+  ret = adau1787_safeload_write(LISTENING_MODE_SWITCH_ADDRESS, codec_param, 1U);
+  if (ret != 0) {
+    LOG_ERR("Failed to select listening mode %u at 0x%04X: %d", mode, LISTENING_MODE_SWITCH_ADDRESS, ret);
+  }
+
+  return ret;
+}
+
+int codec_adapter_init(void)
+{
+  return adau1787_init();
+}
+
+int codec_adapter_select_local(void)
+{
+  return select_listening_mode(LISTENING_MODE_LOCAL);
+}
+
+int codec_adapter_select_i2s(void)
+{
+  return select_listening_mode(LISTENING_MODE_I2S);
 }
