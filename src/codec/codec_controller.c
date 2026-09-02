@@ -9,7 +9,7 @@
 #include "codec_parameters.h"
 
 #if defined(CONFIG_AUDIO_CODEC_ADAU1787)
-#include "hw_codec.h"
+#include "codec_adapter.h"
 #endif
 #include "zbus_common.h"
 
@@ -101,11 +101,10 @@ static int select_local_mode(void)
   int ret;
 
 #if defined(CONFIG_AUDIO_CODEC_ADAU1787)
-  ret = hw_codec_select_local();
+  ret = codec_adapter_select_local();
   if (ret != 0) {
     return ret;
   }
-  /* TODO: Route source selection through Codec Adapter after the parameter proof of concept. */
 #else
   LOG_DBG("Hardware codec disabled; selecting logical local mode only");
 #endif
@@ -125,11 +124,10 @@ static int select_broadcast_mode(void)
   int ret;
 
 #if defined(CONFIG_AUDIO_CODEC_ADAU1787)
-  ret = hw_codec_select_i2s();
+  ret = codec_adapter_select_i2s();
   if (ret != 0) {
     return ret;
   }
-  /* TODO: Route source selection through Codec Adapter after the parameter proof of concept. */
 #else
   LOG_DBG("Hardware codec disabled; selecting logical broadcast mode only");
 #endif
@@ -175,7 +173,7 @@ static void handle_state_off(const struct zbus_channel* channel)
   }
 
 #if defined(CONFIG_AUDIO_CODEC_ADAU1787)
-  ret = hw_codec_init();
+  ret = codec_adapter_init();
   if (ret != 0) {
     LOG_ERR("Failed to initialize the hardware codec: %d", ret);
     enter_error();

@@ -15,5 +15,4 @@ target_sources(app PRIVATE
                ${CMAKE_CURRENT_SOURCE_DIR}/codec_values.c
                ${CMAKE_CURRENT_SOURCE_DIR}/codec_adapter.c
                ${CMAKE_CURRENT_SOURCE_DIR}/sigma_exports.c
-               ${CMAKE_CURRENT_SOURCE_DIR}/hw_codec.c
 )
