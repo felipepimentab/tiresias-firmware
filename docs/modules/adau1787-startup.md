@@ -11,7 +11,7 @@ streaming begins; codec programming therefore precedes regular BCLK/LRCK frames.
 | Codec ownership | `src/codec/codec_controller.c` |
 | Streaming lifecycle | `src/bluetooth/audio_streaming*.c` |
 | Audio pipeline | `src/audio/audio_system.c` |
-| Codec abstraction | `src/codec/codec_adapter.c`, `src/codec/hw_codec.c` |
+| Codec abstraction | `src/codec/codec_adapter.c` (`hw_codec.c` is retained only as an unbuilt reference) |
 | Driver and SigmaStudio adapter | `src/drivers/adau1787.*`, `src/drivers/SigmaStudioFW.h` |
 | Generated DSP image | `src/SigmaStudioFiles/` |
 | Application pins | `boards/tiresias_dk_nrf5340_cpuapp.overlay` |
@@ -21,7 +21,8 @@ streaming begins; codec programming therefore precedes regular BCLK/LRCK frames.
 
 1. Device Controller requests Codec Controller initialization and Audio Streaming scan.
 2. Audio Streaming prepares the audio datapath and idle I2S peripheral.
-3. Codec Controller calls `hw_codec_init()` / `adau1787_init()`.
+3. When `CONFIG_AUDIO_CODEC_ADAU1787` is enabled, Codec Controller calls
+   `codec_adapter_init()` / `adau1787_init()`.
 4. The driver asserts `!PD`, configures MP3-MP6 low, releases `!PD`, and waits 100 ms.
 5. The generated SigmaDSP sequence runs, including its 35 ms delay.
 6. The generated FastDSP sequence stops and starts FastDSP.

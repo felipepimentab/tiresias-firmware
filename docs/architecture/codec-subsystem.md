@@ -26,9 +26,9 @@ flowchart TB
         settings["Codec Settings<br/>current flash adapter"]
         defaults["Codec Defaults<br/>scaffold, not yet built"]
         layout["Codec Layout<br/>planned private address map"]
-        adapter["Codec Adapter<br/>existing hardware stub"]
+        adapter["Codec Adapter<br/>current lifecycle and source selection"]
         image["Codec Image<br/>planned Sigma export owner"]
-        legacy["hw_codec<br/>legacy transition path"]
+        legacy["hw_codec<br/>reference only, not built"]
     end
 
     zephyrSettings[Zephyr Settings]
@@ -45,8 +45,7 @@ flowchart TB
     settings --> zephyrSettings
     contract -. matching public definition .-> workstation
 
-    controller -->|current initialization and source selection| legacy
-    legacy --> driver
+    controller -->|current initialization and source selection| adapter
     driver -->|current generated startup sequence| sigma
 
     controller -. delegate synchronous actions .-> actions
@@ -59,7 +58,7 @@ flowchart TB
     defaults -. read parameter image bytes .-> image
     adapter -. resolve DSP start address .-> layout
     adapter -. load generated codec program .-> image
-    adapter -. live codec access .-> driver
+    adapter -->|live codec access| driver
     layout -. generated address macros .-> sigma
     image -. single ownership of generated definitions .-> sigma
     driver --> bus
@@ -100,9 +99,9 @@ Codec Adapter
 | Codec Settings | Current | Mapping a validated parameter ID to its Zephyr Settings key and copying one complete value to or from flash | Contract interpretation, RAM ownership, defaults, revisions, or codec access |
 | Codec Defaults | Scaffold | Copying one contract parameter's default bytes from the generated parameter image into a caller-provided buffer, including image-range validation | Runtime buffer ownership, flash access, revisions, hardware communication, or lifecycle policy |
 | Codec Layout | Planned | The immutable private mapping from stable parameter ID to physical DSP start address | Public protocol metadata, parameter bytes, persistence, generated program data, or bus communication |
-| Codec Adapter | Existing stub | The only codec-subsystem gateway for initialization, presentation changes, and live parameter-memory reads or writes; translation of operation failures into errno-style results | BLE protocol handling, flash policy, RAM ownership, revisions, or controller state |
+| Codec Adapter | Current lifecycle and source selection; parameter read remains a stub | The only codec-subsystem gateway for initialization, presentation changes, and live parameter-memory reads or writes; translation of operation failures into errno-style results | BLE protocol handling, flash policy, RAM ownership, revisions, or controller state |
 | Codec Image | Planned | Single ownership of definition-bearing SigmaStudio exports and narrow access to the program/parameter images required by Codec Adapter and Codec Defaults | Public parameter identity, runtime state, persistence policy, or controller state |
-| `hw_codec` | Legacy | Known-good behavior used as a reference while Codec Adapter is implemented and validated | New functionality; it must not become a dependency of new parameter modules |
+| `hw_codec` | Reference only, excluded from CMake | Legacy behavior retained for comparison with Codec Adapter | Runtime callers or new functionality |
 | ADAU1787 driver | Current driver layer | Devicetree access, power/reset and GPIO sequencing, register and memory primitives, device timing, and I2C error reporting | Stable public parameter IDs, BLE semantics, flash persistence, revisions, or presentation policy |
 
 `standard_profiles.h` is currently unreferenced data rather than an owned module.
@@ -180,16 +179,16 @@ is implemented.
    header must be included by one translation unit only. Other modules use a
    narrow Codec Image interface to avoid duplicate symbols and generated-code
    leakage.
-6. **Legacy code does not expand.** `hw_codec` remains unchanged until Codec
-   Adapter covers and validates its required behavior, then the legacy path is
-   removed.
+6. **Legacy code is reference only.** `hw_codec` remains unchanged in the repository
+   but is excluded from CMake. Codec Controller uses Codec Adapter for initialization
+   and source selection, still gated by `CONFIG_AUDIO_CODEC_ADAU1787`.
 
 ## Current exceptions to the target boundary
 
 - `codec_contract.h` currently includes `adau1787.h` to obtain the four-byte
   parameter-word width. The target contract should use codec-level metadata so
   the public contract no longer depends on a hardware driver header.
-- Codec Adapter currently accepts raw start addresses and returns `-ENOTSUP`.
+- Codec Adapter's parameter interface currently accepts raw start addresses; reads return `-ENOTSUP`.
   Its completed upper interface should accept stable parameter identity and
   keep physical-address lookup behind Codec Adapter and Codec Layout.
 - The ADAU1787 driver currently includes and executes the definition-bearing
@@ -208,4 +207,5 @@ is implemented.
    driver.
 6. Route Codec Controller actions and planned parameter-memory synchronization
    through Codec Adapter.
-7. Validate the adapter against `hw_codec`, then remove the legacy dependency.
+7. Hardware-validate the migrated initialization and source-selection behavior against
+   the retained `hw_codec` reference; the legacy build dependency has been removed.
