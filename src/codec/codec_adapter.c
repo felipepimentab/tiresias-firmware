@@ -10,7 +10,6 @@
 
 #include <errno.h>
 #include <zephyr/logging/log.h>
-#include <zephyr/sys/util.h>
 
 LOG_MODULE_REGISTER(codec_adapter, CONFIG_LOG_DEFAULT_LEVEL);
 
@@ -22,11 +21,31 @@ LOG_MODULE_REGISTER(codec_adapter, CONFIG_LOG_DEFAULT_LEVEL);
 
 int codec_param_read(uint16_t start_addr, uint8_t* data, size_t len)
 {
-  ARG_UNUSED(start_addr);
-  ARG_UNUSED(data);
-  ARG_UNUSED(len);
+  size_t available_bytes;
+  int ret;
 
-  return -ENOTSUP;
+  if (data == NULL || len == 0U) {
+    return -EINVAL;
+  }
+  if (!IS_PARAM_ADDR(start_addr)) {
+    return -EINVAL;
+  }
+
+  available_bytes = (size_t)ADAU1787_PARAM_RAM_END - start_addr + 1U;
+  if (len > available_bytes) {
+    return -EINVAL;
+  }
+  if (((start_addr - ADAU1787_PARAM_RAM_BASE) % ADAU1787_PARAM_RAM_WIDTH_BYTES) != 0U
+      || (len % ADAU1787_PARAM_RAM_WIDTH_BYTES) != 0U) {
+    return -EINVAL;
+  }
+
+  ret = adau1787_read(start_addr, data, len);
+  if (ret != 0) {
+    LOG_ERR("Failed to read %zu parameter bytes at 0x%04X: %d", len, start_addr, ret);
+  }
+
+  return ret;
 }
 
 int codec_param_write(uint16_t start_addr, const uint8_t* data, size_t len)
