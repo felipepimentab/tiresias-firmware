@@ -23,6 +23,7 @@
 #include <stdint.h>
 #include <zephyr/drivers/i2c.h>
 #include <zephyr/kernel.h>
+#include <zephyr/sys/byteorder.h>
 
 /** @brief SigmaDSP parameter RAM base in the external control-port address map */
 #define ADAU1787_PARAM_RAM_BASE 0x2000
@@ -107,8 +108,8 @@ int adau1787_write_register(sub_addr_t reg_addr, reg_word_t* data);
  * @brief Perform a Safeload Write Operation to the ADAU1787 DSP.
  *
  * This function performs a safeload write to the ADAU1787's parameter RAM.
- * The safeload operation consists of writing up to five 4-byte words (32-bit
- * words) into predefined safeload data registers, setting the target
+ * The safeload operation consists of writing up to five 4-byte SigmaDSP
+ * parameter words into predefined safeload data registers, setting the target
  * address in the parameter RAM, and indicating the number of words to be
  * updated. Once the safeload write is triggered, the DSP core safely
  * transfers the data during the next available audio frame.
@@ -116,7 +117,7 @@ int adau1787_write_register(sub_addr_t reg_addr, reg_word_t* data);
  * @param target_addr SigmaStudio-generated address of the first parameter word
  *                    to update. This address is written to the safeload target
  *                    field without conversion.
- * @param data Pointer to the buffer containing big-endian 32-bit SigmaDSP
+ * @param data Pointer to the buffer containing big-endian four-byte SigmaDSP
  *             parameter words.
  * @param num_words Number of 32-bit words to be written (maximum 5).
  * @return 0 on success, or a negative error code on failure.
@@ -153,5 +154,20 @@ int adau1787_read_register(sub_addr_t reg_addr, reg_word_t* value);
  * @param byte Pointer to the byte array to store the result.
  */
 void split_addr(uint16_t word, uint8_t* byte);
+
+/**
+ * @brief Convert a SigmaStudio-exported fixed-point value to a parameter word.
+ *
+ * SigmaStudio sign-extends its 28-bit Q5.23 values to 32 bits. This function
+ * clears the sign-extension nibble and serializes the remaining 28 bits in the
+ * big-endian format required by the ADAU1787 external control port.
+ *
+ * @param fixpt SigmaStudio-exported 32-bit fixed-point value.
+ * @param word Pointer to a four-byte buffer that receives the parameter word.
+ */
+static inline void sigma_fixpt_to_param_word(uint32_t fixpt, param_word_t word)
+{
+  sys_put_be32(fixpt & 0x0FFFFFFFU, word);
+}
 
 #endif // ADAU1787_H

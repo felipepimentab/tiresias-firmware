@@ -1,0 +1,38 @@
+#!/bin/sh
+
+set -eu
+
+repo_root=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
+
+tiresias_ncs_root=${TIRESIAS_NCS_ROOT:-/opt/nordic/ncs/v3.0.1}
+tiresias_ncs_toolchain=${TIRESIAS_NCS_TOOLCHAIN:-/opt/nordic/ncs/toolchains/ef4fc6722e}
+
+if ! command -v nrfutil >/dev/null 2>&1; then
+	printf '%s\n' "nrfutil was not found in PATH." >&2
+	exit 127
+fi
+
+if [ ! -d "$tiresias_ncs_root/zephyr" ]; then
+	printf 'NCS installation not found: %s\n' "$tiresias_ncs_root" >&2
+	exit 1
+fi
+
+if [ ! -d "$tiresias_ncs_toolchain" ]; then
+	printf 'NCS toolchain not found: %s\n' "$tiresias_ncs_toolchain" >&2
+	exit 1
+fi
+
+export ZEPHYR_BASE="$tiresias_ncs_root/zephyr"
+export BUILD_INFO_SYNC=instant
+
+if [ "$#" -eq 0 ]; then
+	exec nrfutil toolchain-manager launch \
+		--toolchain-path "$tiresias_ncs_toolchain" \
+		--chdir "$repo_root" \
+		--shell
+fi
+
+exec nrfutil toolchain-manager launch \
+	--toolchain-path "$tiresias_ncs_toolchain" \
+	--chdir "$repo_root" \
+	-- "$@"

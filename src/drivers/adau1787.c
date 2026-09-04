@@ -1,16 +1,9 @@
 #include "adau1787.h"
-#include "SigmaStudioFW.h"
-#include "adau_1787_IC_1_FAST.h"
-#include "adau_1787_IC_1_FAST_PARAM.h"
-#include "adau_1787_IC_1_FAST_REG.h"
-#include "adau_1787_IC_1_SIGMA.h"
-#include "adau_1787_IC_1_SIGMA_PARAM.h"
-#include "adau_1787_IC_1_SIGMA_REG.h"
 #include "macros_common.h"
+#include "sigma_exports.h"
 #include <errno.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include <string.h>
 #include <zephyr/drivers/gpio.h>
 #include <zephyr/drivers/i2c.h>
 #include <zephyr/kernel.h>
@@ -22,13 +15,12 @@ LOG_MODULE_REGISTER(adau1787_driver, LOG_LEVEL_INF);
 #define ADAU1787_SAFELOAD_DELAY_US 125U
 /* The exported safeload module contains data slots plus target and trigger parameters. */
 #define ADAU1787_SAFELOAD_MAX_WORDS (MOD_SAFELOADMODULE_COUNT - 2U)
-BUILD_ASSERT(PARAM_ADDR_IC_1_Sigma == 0x2000, "Param Memory Address must be 0x2000.");
 
 /** @brief Device Tree Specification for ADAU1787 */
 #define ADAU1787_NODE DT_NODELABEL(adau_1787)
 
-BUILD_ASSERT(DT_NODE_HAS_STATUS(ADAU1787_NODE, okay),
-    "CONFIG_AUDIO_CODEC_ADAU1787 requires an enabled adau_1787 devicetree node");
+BUILD_ASSERT(
+    DT_NODE_HAS_STATUS(ADAU1787_NODE, okay), "The ADAU1787 driver requires an enabled adau_1787 devicetree node");
 BUILD_ASSERT(DT_ON_BUS(ADAU1787_NODE, i2c), "The adau_1787 devicetree node must be on an I2C bus");
 BUILD_ASSERT(
     DT_NODE_HAS_PROP(ADAU1787_NODE, powerdown_gpios), "The adau_1787 devicetree node requires powerdown-gpios");
@@ -303,7 +295,7 @@ int adau1787_read_register(sub_addr_t reg_addr, reg_word_t* value)
   return adau1787_read(reg_addr, value, ADAU1787_CTRL_REG_WIDTH_BYTES);
 }
 
-// Conversions
+// TO-DO: replace with `sys_put_be16()`
 void split_addr(uint16_t word, uint8_t* byte)
 {
   byte[0] = (word >> 8) & 0xFF; // High byte

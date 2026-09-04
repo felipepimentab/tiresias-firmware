@@ -1,59 +1,34 @@
 # Documentation
 
-The documentation is organized by purpose so readers can move from system
-intent to implementation details without mixing abstraction levels.
+Quick references are grouped by scope.
 
 ## Architecture
 
-Architecture documents describe system boundaries, major components, and
-design responsibilities. They should explain what the system is and why it is
-structured that way, without becoming source-level API references.
-
-- [System context](architecture/system-context.md): intended product context
-  and the current proof-of-concept environment.
-- [Firmware control plane](architecture/control-plane.md): subsystem naming,
-  state-machine ownership, and coordination.
-- [Control Link and remote management](architecture/control-link.md): custom BLE
-  service, discoverable codec parameter catalog, security, system integration, and future
-  Auracast Broadcast Assistant support.
-- [Threads and execution contexts](architecture/threads-and-contexts.md): control-plane
-  threads, callback boundaries, data-plane workers, and implementation status.
-- [Zbus channels](architecture/zbus.md): private-state mirroring, control-plane publishers,
-  subscribers, acknowledgement behavior, and delivery constraints.
-- [Hardware](architecture/hardware.md): principal hardware components and
-  physical interfaces.
+- [System context](architecture/system-context.md): product and PoC boundaries.
+- [Control plane](architecture/control-plane.md): subsystem ownership and states.
+- [Codec subsystem](architecture/codec-subsystem.md): codec module boundaries,
+  dependencies, and planned hardware integration.
+- [Control Link](architecture/control-link.md): BLE management protocol design.
+- [Threads and contexts](architecture/threads-and-contexts.md): execution and priority rules.
+- [Zbus](architecture/zbus.md): channel ownership and delivery contracts.
+- [Hardware](architecture/hardware.md): board-level blocks and interfaces.
+- [Audio messages](architecture/audio-application.md): current message ownership.
+- [Source layout](architecture/source-layout.md): ownership boundaries and incremental organization.
 
 ## Development
 
-Development documents describe workflows, generated artifacts, build
-expectations, tool limitations, and recurring troubleshooting guidance.
-
-- [Development workflow and reminders](development/workflow.md): build hygiene,
-  SigmaStudio export handling, and the canonical home for cross-cutting
-  developer reminders.
+- [Workflow](development/workflow.md): SigmaStudio and generated-file rules.
 
 ## Modules
 
-Module documents describe implementation-level responsibilities, public APIs,
-configuration requirements, and message contracts.
+- [ADAU1787 startup](modules/adau1787-startup.md)
+- [Bluetooth Management](modules/bluetooth-management.md)
+- [Button Input](modules/button.md)
+- [LED Indicator](modules/led.md)
 
-- [Button Input subsystem](modules/button.md): button GPIO handling and Zbus events.
-- [Bluetooth Management](modules/bluetooth-management.md): shared Bluetooth initialization,
-  advertising execution, physical event fan-out, and Control Link/Audio Streaming
-  concurrency rules.
-- [ADAU1787 startup](modules/adau1787-startup.md): codec reset, I2C programming,
-  SigmaStudio download, I2S activation, status checks, and failure behavior.
-- [LED Indicator subsystem](modules/led.md): LED commands, GPIO handling, and blink behavior.
+## Writing guidelines
 
-## Where New Documentation Belongs
-
-- Put system boundaries, major design decisions, and cross-subsystem behavior
-  in `architecture/`.
-- Put build, tooling, generated-code, flashing, and repository-wide workflow
-  guidance in `development/`.
-- Put source-level contracts and module extension guidance in `modules/`.
-- Keep assets next to the document that owns them unless several documents
-  share the same asset.
-
-Prefer focused documents with descriptive names. Link new documents from this
-index and from the repository README when they are important entry points.
+- Put system boundaries and cross-subsystem decisions in `architecture/`.
+- Put repository-wide workflows in `development/`.
+- Put source contracts and extension notes in `modules/`.
+- Keep documents brief, actionable, and linked from this index.

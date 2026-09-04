@@ -26,11 +26,8 @@
 #include <zephyr/kernel.h>
 #include <zephyr/sys/byteorder.h>
 
-/*
- * TODO: Update for your system's data type
- */
 typedef unsigned short ADI_DATA_U16;
-typedef unsigned char ADI_REG_TYPE;
+typedef uint8_t ADI_REG_TYPE;
 
 #define SIGMASTUDIO_DELAY_WIDTH_BYTES 2U
 

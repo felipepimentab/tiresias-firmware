@@ -8,6 +8,7 @@
 #include "fw_info_app.h"
 #include "macros_common.h"
 #include "tiresias_dk.h"
+#include "tiresias_service.h"
 
 #include <zephyr/logging/log.h>
 
@@ -23,6 +24,9 @@ int main(void)
   ERR_CHK(ret);
 
   ret = fw_info_app_print();
+  ERR_CHK(ret);
+
+  ret = tiresias_service_init();
   ERR_CHK(ret);
 
   ret = device_controller_run();

@@ -21,13 +21,13 @@ config TIRESIAS_AUDIO_HW
 	  is discarded by compile-time stubs.
 
 config AUDIO_CODEC_ADAU1787
-	bool "Enable ADAU1787 codec"
+	bool "Enable ADAU1787 codec integration"
 	default y if TIRESIAS_AUDIO_HW
 	depends on I2C && GPIO
 	help
-	  Enable the ADAU1787 codec driver, SigmaStudio firmware, and hardware
-	  codec control. This option is independent of the Tiresias audio path
-	  and can be enabled for an external ADAU1787 connected to another board.
+	  Enable ADAU1787 hardware behavior in Codec Controller. The ADAU1787
+	  driver and SigmaStudio export compile independently of this option so
+	  their APIs and compile coverage remain available during integration work.
 
 	  The target devicetree must provide an enabled adau_1787 node on the
 	  desired I2C bus, including powerdown-gpios and MP3 through MP6 GPIOs.

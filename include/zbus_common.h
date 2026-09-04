@@ -99,7 +99,8 @@ typedef struct control_link_cmd_chan_msg {
 typedef enum control_link_state {
   CONTROL_LINK_STATE_DISABLED,
   CONTROL_LINK_STATE_ADVERTISING,
-  CONTROL_LINK_STATE_CONNECTED,
+  CONTROL_LINK_STATE_LINKED,
+  CONTROL_LINK_STATE_READY,
   CONTROL_LINK_STATE_ERROR,
 } control_link_state;
 

@@ -1,0 +1,8 @@
+{
+    "recommendations": [
+        "nordic-semiconductor.nrf-connect-extension-pack",
+        "ms-vscode.cmake-tools",
+        "ms-vscode.cpptools-extension-pack",
+        "KyleMicallefBonnici.dts-lsp"
+    ]
+}

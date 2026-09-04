@@ -1,4 +1,4 @@
-Cell Name         = Phase Comp.Gen Filter 1
+Cell Name         = Phase Comp.All Pass 1
 Parameter Name    = EQ1940Single10B1
 Parameter Address = 9240
 Parameter Value   = 0.897531986236572
@@ -7,7 +7,7 @@ Parameter Data :
 
 
 
-Cell Name         = Phase Comp.Gen Filter 1
+Cell Name         = Phase Comp.All Pass 1
 Parameter Name    = EQ1940Single11B1
 Parameter Address = 9244
 Parameter Value   = -1.89210164546967
@@ -16,7 +16,7 @@ Parameter Data :
 
 
 
-Cell Name         = Phase Comp.Gen Filter 1
+Cell Name         = Phase Comp.All Pass 1
 Parameter Name    = EQ1940Single12B1
 Parameter Address = 9248
 Parameter Value   = 1
@@ -25,7 +25,7 @@ Parameter Data :
 
 
 
-Cell Name         = Phase Comp.Gen Filter 1
+Cell Name         = Phase Comp.All Pass 1
 Parameter Name    = EQ1940Single11A1
 Parameter Address = 9252
 Parameter Value   = 1.89210164546967
@@ -34,7 +34,7 @@ Parameter Data :
 
 
 
-Cell Name         = Phase Comp.Gen Filter 1
+Cell Name         = Phase Comp.All Pass 1
 Parameter Name    = EQ1940Single12A1
 Parameter Address = 9256
 Parameter Value   = -0.897531986236572
@@ -43,7 +43,7 @@ Parameter Data :
 
 
 
-Cell Name         = Phase Comp.Gen Filter 2
+Cell Name         = Phase Comp.All Pass 2
 Parameter Name    = EQ1940Single20B1
 Parameter Address = 9748
 Parameter Value   = 0.833674192428589
@@ -52,7 +52,7 @@ Parameter Data :
 
 
 
-Cell Name         = Phase Comp.Gen Filter 2
+Cell Name         = Phase Comp.All Pass 2
 Parameter Name    = EQ1940Single21B1
 Parameter Address = 9752
 Parameter Value   = -1.81882894039154
@@ -61,7 +61,7 @@ Parameter Data :
 
 
 
-Cell Name         = Phase Comp.Gen Filter 2
+Cell Name         = Phase Comp.All Pass 2
 Parameter Name    = EQ1940Single22B1
 Parameter Address = 9756
 Parameter Value   = 1
@@ -70,7 +70,7 @@ Parameter Data :
 
 
 
-Cell Name         = Phase Comp.Gen Filter 2
+Cell Name         = Phase Comp.All Pass 2
 Parameter Name    = EQ1940Single21A1
 Parameter Address = 9760
 Parameter Value   = 1.81882894039154
@@ -79,7 +79,7 @@ Parameter Data :
 
 
 
-Cell Name         = Phase Comp.Gen Filter 2
+Cell Name         = Phase Comp.All Pass 2
 Parameter Name    = EQ1940Single22A1
 Parameter Address = 9764
 Parameter Value   = -0.833674192428589
@@ -88,7 +88,7 @@ Parameter Data :
 
 
 
-Cell Name         = Phase Comp.Gen Filter 3
+Cell Name         = Phase Comp.All Pass 3
 Parameter Name    = EQ1940Single30B1
 Parameter Address = 10088
 Parameter Value   = 0.736448287963867
@@ -97,7 +97,7 @@ Parameter Data :
 
 
 
-Cell Name         = Phase Comp.Gen Filter 3
+Cell Name         = Phase Comp.All Pass 3
 Parameter Name    = EQ1940Single31B1
 Parameter Address = 10092
 Parameter Value   = -1.69679462909698
@@ -106,7 +106,7 @@ Parameter Data :
 
 
 
-Cell Name         = Phase Comp.Gen Filter 3
+Cell Name         = Phase Comp.All Pass 3
 Parameter Name    = EQ1940Single32B1
 Parameter Address = 10096
 Parameter Value   = 1
@@ -115,7 +115,7 @@ Parameter Data :
 
 
 
-Cell Name         = Phase Comp.Gen Filter 3
+Cell Name         = Phase Comp.All Pass 3
 Parameter Name    = EQ1940Single31A1
 Parameter Address = 10100
 Parameter Value   = 1.69679462909698
@@ -124,7 +124,7 @@ Parameter Data :
 
 
 
-Cell Name         = Phase Comp.Gen Filter 3
+Cell Name         = Phase Comp.All Pass 3
 Parameter Name    = EQ1940Single32A1
 Parameter Address = 10104
 Parameter Value   = -0.736448287963867
@@ -133,7 +133,7 @@ Parameter Data :
 
 
 
-Cell Name         = Phase Comp.Gen Filter 4
+Cell Name         = Phase Comp.All Pass 4
 Parameter Name    = EQ1940Single40B1
 Parameter Address = 10268
 Parameter Value   = 0.597884058952332
@@ -142,7 +142,7 @@ Parameter Data :
 
 
 
-Cell Name         = Phase Comp.Gen Filter 4
+Cell Name         = Phase Comp.All Pass 4
 Parameter Name    = EQ1940Single41B1
 Parameter Address = 10272
 Parameter Value   = -1.49542856216431
@@ -151,7 +151,7 @@ Parameter Data :
 
 
 
-Cell Name         = Phase Comp.Gen Filter 4
+Cell Name         = Phase Comp.All Pass 4
 Parameter Name    = EQ1940Single42B1
 Parameter Address = 10276
 Parameter Value   = 1
@@ -160,7 +160,7 @@ Parameter Data :
 
 
 
-Cell Name         = Phase Comp.Gen Filter 4
+Cell Name         = Phase Comp.All Pass 4
 Parameter Name    = EQ1940Single41A1
 Parameter Address = 10280
 Parameter Value   = 1.49542856216431
@@ -169,7 +169,7 @@ Parameter Data :
 
 
 
-Cell Name         = Phase Comp.Gen Filter 4
+Cell Name         = Phase Comp.All Pass 4
 Parameter Name    = EQ1940Single42A1
 Parameter Address = 10284
 Parameter Value   = -0.597884058952332
@@ -178,7 +178,7 @@ Parameter Data :
 
 
 
-Cell Name         = Phase Comp.Gen Filter 5
+Cell Name         = Phase Comp.All Pass 5
 Parameter Name    = EQ1940Single50B1
 Parameter Address = 10288
 Parameter Value   = 0.421868324279785
@@ -187,7 +187,7 @@ Parameter Data :
 
 
 
-Cell Name         = Phase Comp.Gen Filter 5
+Cell Name         = Phase Comp.All Pass 5
 Parameter Name    = EQ1940Single51B1
 Parameter Address = 10292
 Parameter Value   = -1.16901934146881
@@ -196,7 +196,7 @@ Parameter Data :
 
 
 
-Cell Name         = Phase Comp.Gen Filter 5
+Cell Name         = Phase Comp.All Pass 5
 Parameter Name    = EQ1940Single52B1
 Parameter Address = 10296
 Parameter Value   = 1
@@ -205,7 +205,7 @@ Parameter Data :
 
 
 
-Cell Name         = Phase Comp.Gen Filter 5
+Cell Name         = Phase Comp.All Pass 5
 Parameter Name    = EQ1940Single51A1
 Parameter Address = 10300
 Parameter Value   = 1.16901934146881
@@ -214,7 +214,7 @@ Parameter Data :
 
 
 
-Cell Name         = Phase Comp.Gen Filter 5
+Cell Name         = Phase Comp.All Pass 5
 Parameter Name    = EQ1940Single52A1
 Parameter Address = 10304
 Parameter Value   = -0.421868324279785
@@ -223,7 +223,7 @@ Parameter Data :
 
 
 
-Cell Name         = Phase Comp.Gen Filter 6
+Cell Name         = Phase Comp.All Pass 6
 Parameter Name    = EQ1940Single60B1
 Parameter Address = 10308
 Parameter Value   = 0.243706703186035
@@ -232,7 +232,7 @@ Parameter Data :
 
 
 
-Cell Name         = Phase Comp.Gen Filter 6
+Cell Name         = Phase Comp.All Pass 6
 Parameter Name    = EQ1940Single61B1
 Parameter Address = 10312
 Parameter Value   = -0.652477264404297
@@ -241,7 +241,7 @@ Parameter Data :
 
 
 
-Cell Name         = Phase Comp.Gen Filter 6
+Cell Name         = Phase Comp.All Pass 6
 Parameter Name    = EQ1940Single62B1
 Parameter Address = 10316
 Parameter Value   = 1
@@ -250,7 +250,7 @@ Parameter Data :
 
 
 
-Cell Name         = Phase Comp.Gen Filter 6
+Cell Name         = Phase Comp.All Pass 6
 Parameter Name    = EQ1940Single61A1
 Parameter Address = 10320
 Parameter Value   = 0.652477264404297
@@ -259,7 +259,7 @@ Parameter Data :
 
 
 
-Cell Name         = Phase Comp.Gen Filter 6
+Cell Name         = Phase Comp.All Pass 6
 Parameter Name    = EQ1940Single62A1
 Parameter Address = 10324
 Parameter Value   = -0.243706703186035
@@ -268,7 +268,7 @@ Parameter Data :
 
 
 
-Cell Name         = Phase Comp.Gen Filter 7
+Cell Name         = Phase Comp.All Pass 7
 Parameter Name    = EQ1940Single70B1
 Parameter Address = 10328
 Parameter Value   = 0.171592235565186
@@ -277,7 +277,7 @@ Parameter Data :
 
 
 
-Cell Name         = Phase Comp.Gen Filter 7
+Cell Name         = Phase Comp.All Pass 7
 Parameter Name    = EQ1940Single71B1
 Parameter Address = 10332
 Parameter Value   = 0.166012525558472
@@ -286,7 +286,7 @@ Parameter Data :
 
 
 
-Cell Name         = Phase Comp.Gen Filter 7
+Cell Name         = Phase Comp.All Pass 7
 Parameter Name    = EQ1940Single72B1
 Parameter Address = 10336
 Parameter Value   = 1
@@ -295,7 +295,7 @@ Parameter Data :
 
 
 
-Cell Name         = Phase Comp.Gen Filter 7
+Cell Name         = Phase Comp.All Pass 7
 Parameter Name    = EQ1940Single71A1
 Parameter Address = 10340
 Parameter Value   = -0.166012525558472
@@ -304,7 +304,7 @@ Parameter Data :
 
 
 
-Cell Name         = Phase Comp.Gen Filter 7
+Cell Name         = Phase Comp.All Pass 7
 Parameter Name    = EQ1940Single72A1
 Parameter Address = 10344
 Parameter Value   = -0.171592235565186
@@ -2594,6 +2594,85 @@ Parameter Data :
 
 
 
+Cell Name         = Output Headroom
+Parameter Name    = Gain1940AlgNS4
+Parameter Address = 10360
+Parameter Value   = 1
+Parameter Data :
+0x00, 0x80, 0x00, 0x00, 
+
+
+
+Cell Name         = SoftClip
+Parameter Name    = MonoPeak_StResHiRange_NoExt_NoPos1
+Parameter Address = 10364
+Parameter Data :
+0x00, 0x8F, 0x0F, 0xB5, 
+0x00, 0xC2, 0x44, 0x9E, 
+0x01, 0x07, 0xCD, 0xAA, 
+0x01, 0x66, 0x3A, 0x53, 
+0x01, 0xE6, 0x73, 0x3C, 
+0x02, 0x94, 0x91, 0x53, 
+0x03, 0x81, 0x02, 0x0C, 
+0x04, 0xC2, 0x14, 0x1E, 
+0x06, 0x76, 0x12, 0x53, 
+0x07, 0x10, 0x0C, 0x4D, 
+0x07, 0x10, 0x0C, 0x4D, 
+0x07, 0x10, 0x0C, 0x4D, 
+0x07, 0x10, 0x0C, 0x4D, 
+0x07, 0x10, 0x0C, 0x4D, 
+0x07, 0x10, 0x0C, 0x4D, 
+0x07, 0x10, 0x0C, 0x4D, 
+0x07, 0x10, 0x0C, 0x4D, 
+0x07, 0x10, 0x0C, 0x4D, 
+0x07, 0x10, 0x0C, 0x4D, 
+0x07, 0x10, 0x0C, 0x4D, 
+0x07, 0x10, 0x0C, 0x4D, 
+0x07, 0x10, 0x0C, 0x4D, 
+0x07, 0x10, 0x0C, 0x4D, 
+0x07, 0x10, 0x0C, 0x4D, 
+0x07, 0x10, 0x0C, 0x4D, 
+0x07, 0x10, 0x0C, 0x4D, 
+0x07, 0x10, 0x0C, 0x4D, 
+0x07, 0x10, 0x0C, 0x4D, 
+0x07, 0x10, 0x0C, 0x4D, 
+0x07, 0x10, 0x0C, 0x4D, 
+0x07, 0x10, 0x0C, 0x4D, 
+0x07, 0x10, 0x0C, 0x4D, 
+0x07, 0x0A, 0x3C, 0xC7, 
+0x05, 0x00, 0x00, 0x00, 
+0x03, 0x8A, 0x2B, 0xAD, 
+0x02, 0x81, 0x85, 0x08, 
+0x01, 0xC6, 0x29, 0x40, 
+0x01, 0x41, 0x85, 0x7F, 
+0x00, 0xE3, 0x9E, 0xA9, 
+0x04, 0xFA, 0x5F, 0xD1, 
+0x03, 0x85, 0x1E, 0x63, 
+0x02, 0x7D, 0x2F, 0xE9, 
+0x01, 0xC2, 0x8F, 0x32, 
+0x01, 0x3E, 0x97, 0xF4, 
+0x00, 0xE1, 0x47, 0x99, 
+
+
+
+Cell Name         = SoftClip
+Parameter Name    = MonoPeak_StResHiRange_NoExt_NoPos1hold
+Parameter Address = 10544
+Parameter Value   = 0
+Parameter Data :
+0x00 ,	0x00 ,	0x00 ,	0x00 ,	
+
+
+
+Cell Name         = SoftClip
+Parameter Name    = MonoPeak_StResHiRange_NoExt_NoPos1decay
+Parameter Address = 10548
+Parameter Value   = 5.66244125366211E-05
+Parameter Data :
+0x00 ,	0x00 ,	0x01 ,	0xDB ,	
+
+
+
 Cell Name         = None - Framework
 Parameter Name    = dataLoadStart_SafeLoad
 Parameter Address = 8196
@@ -3219,8 +3298,110 @@ See also adau_1787.hex file
 0x00 , 	0x00 , 	0x00 , 	0x00 , 	
 0x00 , 	0x00 , 	0x00 , 	0x00 , 	
 0x00 , 	0x00 , 	0x00 , 	0x00 , 	
+0x00 , 	0x00 , 	0x00 , 	0x00 , 	
+0x00 , 	0x00 , 	0x00 , 	0x00 , 	
+0x00 , 	0x00 , 	0x00 , 	0x00 , 	
+0x00 , 	0x00 , 	0x00 , 	0x00 , 	
+0x00 , 	0x00 , 	0x00 , 	0x00 , 	
+0x00 , 	0x00 , 	0x00 , 	0x00 , 	
+0x00 , 	0x00 , 	0x00 , 	0x00 , 	
+0x00 , 	0x00 , 	0x00 , 	0x00 , 	
+0x00 , 	0x00 , 	0x00 , 	0x00 , 	
+0x00 , 	0x00 , 	0x00 , 	0x00 , 	
+0x00 , 	0x00 , 	0x00 , 	0x00 , 	
+0x00 , 	0x00 , 	0x00 , 	0x00 , 	
+0x00 , 	0x00 , 	0x00 , 	0x00 , 	
+0x00 , 	0x00 , 	0x00 , 	0x00 , 	
+0x00 , 	0x00 , 	0x00 , 	0x00 , 	
+0x00 , 	0x00 , 	0x00 , 	0x00 , 	
+0x00 , 	0x00 , 	0x00 , 	0x00 , 	
+0x00 , 	0x00 , 	0x00 , 	0x00 , 	
+0x00 , 	0x00 , 	0x00 , 	0x00 , 	
+0x00 , 	0x00 , 	0x00 , 	0x00 , 	
+0x00 , 	0x00 , 	0x00 , 	0x00 , 	
+0x00 , 	0x00 , 	0x00 , 	0x00 , 	
+0x00 , 	0x00 , 	0x00 , 	0x00 , 	
+0x00 , 	0x00 , 	0x00 , 	0x00 , 	
+0x00 , 	0x00 , 	0x00 , 	0x00 , 	
+0x00 , 	0x00 , 	0x00 , 	0x00 , 	
+0x00 , 	0x00 , 	0x00 , 	0x00 , 	
+0x00 , 	0x00 , 	0x00 , 	0x00 , 	
+0x00 , 	0x00 , 	0x00 , 	0x00 , 	
+0x00 , 	0x00 , 	0x00 , 	0x00 , 	
+0x00 , 	0x00 , 	0x00 , 	0x00 , 	
+0x00 , 	0x00 , 	0x00 , 	0x00 , 	
+0x00 , 	0x00 , 	0x00 , 	0x00 , 	
+0x00 , 	0x00 , 	0x00 , 	0x00 , 	
+0x00 , 	0x00 , 	0x00 , 	0x00 , 	
+0x00 , 	0x00 , 	0x00 , 	0x00 , 	
+0x00 , 	0x00 , 	0x00 , 	0x00 , 	
+0x00 , 	0x00 , 	0x00 , 	0x00 , 	
+0x00 , 	0x00 , 	0x00 , 	0x00 , 	
+0x00 , 	0x00 , 	0x00 , 	0x00 , 	
+0x00 , 	0x00 , 	0x00 , 	0x00 , 	
+0x00 , 	0x00 , 	0x00 , 	0x00 , 	
+0x00 , 	0x00 , 	0x00 , 	0x00 , 	
+0x00 , 	0x00 , 	0x00 , 	0x00 , 	
+0x00 , 	0x00 , 	0x00 , 	0x00 , 	
+0x00 , 	0x00 , 	0x00 , 	0x00 , 	
+0x00 , 	0x00 , 	0x00 , 	0x00 , 	
+0x00 , 	0x00 , 	0x00 , 	0x00 , 	
+0x00 , 	0x00 , 	0x00 , 	0x00 , 	
+0x00 , 	0x00 , 	0x00 , 	0x00 , 	
+0x00 , 	0x00 , 	0x00 , 	0x00 , 	
 
 Parameter data for: IC 1-Sigma (Binary format starting at parameter address 0)
+00000000	00000000	00000000	00000000	
+00000000	00000000	00000000	00000000	
+00000000	00000000	00000000	00000000	
+00000000	00000000	00000000	00000000	
+00000000	00000000	00000000	00000000	
+00000000	00000000	00000000	00000000	
+00000000	00000000	00000000	00000000	
+00000000	00000000	00000000	00000000	
+00000000	00000000	00000000	00000000	
+00000000	00000000	00000000	00000000	
+00000000	00000000	00000000	00000000	
+00000000	00000000	00000000	00000000	
+00000000	00000000	00000000	00000000	
+00000000	00000000	00000000	00000000	
+00000000	00000000	00000000	00000000	
+00000000	00000000	00000000	00000000	
+00000000	00000000	00000000	00000000	
+00000000	00000000	00000000	00000000	
+00000000	00000000	00000000	00000000	
+00000000	00000000	00000000	00000000	
+00000000	00000000	00000000	00000000	
+00000000	00000000	00000000	00000000	
+00000000	00000000	00000000	00000000	
+00000000	00000000	00000000	00000000	
+00000000	00000000	00000000	00000000	
+00000000	00000000	00000000	00000000	
+00000000	00000000	00000000	00000000	
+00000000	00000000	00000000	00000000	
+00000000	00000000	00000000	00000000	
+00000000	00000000	00000000	00000000	
+00000000	00000000	00000000	00000000	
+00000000	00000000	00000000	00000000	
+00000000	00000000	00000000	00000000	
+00000000	00000000	00000000	00000000	
+00000000	00000000	00000000	00000000	
+00000000	00000000	00000000	00000000	
+00000000	00000000	00000000	00000000	
+00000000	00000000	00000000	00000000	
+00000000	00000000	00000000	00000000	
+00000000	00000000	00000000	00000000	
+00000000	00000000	00000000	00000000	
+00000000	00000000	00000000	00000000	
+00000000	00000000	00000000	00000000	
+00000000	00000000	00000000	00000000	
+00000000	00000000	00000000	00000000	
+00000000	00000000	00000000	00000000	
+00000000	00000000	00000000	00000000	
+00000000	00000000	00000000	00000000	
+00000000	00000000	00000000	00000000	
+00000000	00000000	00000000	00000000	
+00000000	00000000	00000000	00000000	
 00000000	00000000	00000000	00000000	
 00000000	00000000	00000000	00000000	
 00000000	00000000	00000000	00000000	
