@@ -16,20 +16,16 @@ properties:
 
   mp3-gpios:
     type: phandle-array
-    required: true
     description: GPIO connected to the codec MP3 multipurpose pin.
 
   mp4-gpios:
     type: phandle-array
-    required: true
     description: GPIO connected to the codec MP4 multipurpose pin.
 
   mp5-gpios:
     type: phandle-array
-    required: true
     description: GPIO connected to the codec MP5 multipurpose pin.
 
   mp6-gpios:
     type: phandle-array
-    required: true
     description: GPIO connected to the codec MP6 multipurpose pin.
