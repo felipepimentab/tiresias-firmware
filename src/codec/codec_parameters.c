@@ -6,6 +6,10 @@
 
 #include "codec_parameters.h"
 
+#if defined(CONFIG_AUDIO_CODEC_ADAU1787)
+#include "codec_adapter.h"
+#include "codec_program.h"
+#endif
 #include "codec_contract.h"
 #include "codec_defaults.h"
 #include "codec_settings.h"
@@ -25,6 +29,21 @@ static uint8_t* parameter_value(const struct codec_parameter* parameter)
 {
   return codec_values_get(parameter->id);
 }
+
+#if defined(CONFIG_AUDIO_CODEC_ADAU1787)
+static int apply_parameter(const struct codec_parameter* parameter, const uint8_t* data)
+{
+  sub_addr_t address;
+  int ret;
+
+  ret = get_param_address(parameter->id, &address);
+  if (ret != 0) {
+    return ret;
+  }
+
+  return codec_param_write(address, data, parameter->byte_count);
+}
+#endif
 
 static int persist_parameter(const struct codec_parameter* parameter, const uint8_t* data, uint32_t* revision)
 {
@@ -75,9 +94,15 @@ int codec_parameters_init(void)
     if (ret != 0) {
       goto out;
     }
+
+#if defined(CONFIG_AUDIO_CODEC_ADAU1787)
+    ret = apply_parameter(parameter, parameter_value(parameter));
+    if (ret != 0) {
+      goto out;
+    }
+#endif
   }
 
-  /* TODO: Apply the restored parameter buffers through Codec Adapter after the proof of concept. */
   atomic_set(&parameters_initialized, 1);
 
 out:
@@ -137,7 +162,13 @@ int codec_parameters_set(uint8_t id, const uint8_t* data, size_t size, uint32_t*
     goto out;
   }
 
-  /* TODO: Apply the update through Codec Adapter before persistence after the proof of concept. */
+#if defined(CONFIG_AUDIO_CODEC_ADAU1787)
+  ret = apply_parameter(parameter, data);
+  if (ret != 0) {
+    goto out;
+  }
+#endif
+
   ret = persist_parameter(parameter, data, revision);
 
 out:
