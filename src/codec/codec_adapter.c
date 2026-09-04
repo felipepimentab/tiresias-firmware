@@ -48,6 +48,39 @@ int codec_param_read(uint16_t start_addr, uint8_t* data, size_t len)
   return ret;
 }
 
+static int verify_param_write(uint16_t start_addr, const uint8_t* expected, size_t len)
+{
+  uint8_t actual[SAFELOAD_MAX_WORDS * ADAU1787_PARAM_RAM_WIDTH_BYTES];
+  size_t offset = 0U;
+  int ret;
+
+  while (offset < len) {
+    size_t chunk_len = len - offset;
+    uint16_t chunk_addr = start_addr + (uint16_t)offset;
+
+    if (chunk_len > sizeof(actual)) {
+      chunk_len = sizeof(actual);
+    }
+
+    ret = codec_param_read(chunk_addr, actual, chunk_len);
+    if (ret != 0) {
+      return ret;
+    }
+
+    for (size_t index = 0U; index < chunk_len; index++) {
+      if (actual[index] != expected[offset + index]) {
+        LOG_ERR("Parameter verification failed at 0x%04X: wrote 0x%02X, read 0x%02X", chunk_addr + (uint16_t)index,
+            expected[offset + index], actual[index]);
+        return -EIO;
+      }
+    }
+
+    offset += chunk_len;
+  }
+
+  return 0;
+}
+
 int codec_param_write(uint16_t start_addr, const uint8_t* data, size_t len)
 {
   size_t available_bytes;
@@ -72,7 +105,13 @@ int codec_param_write(uint16_t start_addr, const uint8_t* data, size_t len)
   }
 
   if (len <= SAFELOAD_MAX_WORDS * ADAU1787_PARAM_RAM_WIDTH_BYTES) {
-    return adau1787_safeload_write(start_addr, (uint8_t*)data, len / ADAU1787_PARAM_RAM_WIDTH_BYTES);
+    /* TODO: Make the ADAU1787 write APIs accept const data buffers and remove these casts. */
+    ret = adau1787_safeload_write(start_addr, (uint8_t*)data, len / ADAU1787_PARAM_RAM_WIDTH_BYTES);
+    if (ret != 0) {
+      return ret;
+    }
+
+    return verify_param_write(start_addr, data, len);
   }
 
   sdsp_run = 0U;
@@ -85,6 +124,8 @@ int codec_param_write(uint16_t start_addr, const uint8_t* data, size_t len)
   ret = adau1787_write(start_addr, (uint8_t*)data, len);
   if (ret != 0) {
     LOG_ERR("Failed to write %zu parameter bytes at 0x%04X: %d", len, start_addr, ret);
+  } else {
+    ret = verify_param_write(start_addr, data, len);
   }
 
   sdsp_run = R110_SDSP_RUN_IC_1_Sigma;

@@ -22,6 +22,8 @@ int codec_param_read(uint16_t start_addr, uint8_t* data, size_t len);
  *
  * Values of up to five complete parameter words use SigmaDSP safeload.
  * Larger values are written directly while the SigmaDSP is stopped.
+ * Successful transfers are read back from parameter RAM and compared with the
+ * requested value before returning.
  *
  * @param start_addr Four-byte-aligned external parameter RAM address.
  * @param data Complete parameter words in external control-port byte order.
